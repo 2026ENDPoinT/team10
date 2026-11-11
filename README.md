@@ -13,6 +13,8 @@ ENDPoinT 해커톤 2026 Team 10
 ---
 
 **파일 예시**
+
+```
 team10/
 │
 ├── app.py                    # Flask 서버 실행 및 페이지 라우팅
@@ -53,3 +55,4 @@ team10/
 │
 └── data/                     # 데이터 저장
     └── scores.db             # SQLite 데이터베이스 (자동 생성)
+```
