@@ -1,1 +1,44 @@
 /*메인 페이지*/
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>대학생 성적 관리 프로그램 - 메인</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container login-container">
+        <h1>🎓 대학생 성적 관리 프로그램</h1>
+        <p class="desc">시작하려면 학번, 이름, 학년을 입력해주세요.</p>
+
+        <div class="form-card">
+            <form action="{{ url_for('scores') }}" method="GET">
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label for="student_id" style="display:block; margin-bottom:5px; font-weight:bold;">학번</label>
+                    <input type="text" id="student_id" name="student_id" placeholder="예: 26101167" required style="width:100%; padding:10px;">
+                </div>
+
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label for="name" style="display:block; margin-bottom:5px; font-weight:bold;">이름</label>
+                    <input type="text" id="name" name="name" placeholder="예: 김준호" required style="width:100%; padding:10px;">
+                </div>
+
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label for="year" style="display:block; margin-bottom:5px; font-weight:bold;">학년</label>
+                    <select id="year" name="year" required style="width:100%; padding:10px;">
+                        <option value="" disabled selected>학년을 선택하세요</option>
+                        <option value="1">1학년</option>
+                        <option value="2">2학년</option>
+                        <option value="3">3학년</option>
+                        <option value="4">4학년</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
+                    성적 입력 페이지로 이동
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
