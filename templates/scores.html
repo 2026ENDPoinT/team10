@@ -1,1 +1,103 @@
 /*성적 입력 및 조회*/
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>대학생 성적 관리 프로그램 - 성적 관리</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header-info">
+            <h1>🎓 성적 관리 프로그램</h1>
+            <p><strong>{{ year }}학년</strong> | 학번: <strong>{{ student_id }}</strong> | 이름: <strong>{{ name }}</strong>님 환영합니다!</p>
+            <a href="{{ url_for('index') }}" class="btn-back-main">처음 화면으로</a>
+        </div>
+
+        <!-- 플래시 메시지 (예외 처리 및 알림 출력) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash-messages">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <!-- 기능 3: 평점평균(GPA) 자동 계산 및 학점 표시 요약 카드 -->
+        <div class="summary-card">
+            <h2>📊 전체 성적 요약</h2>
+            <p><strong>전체 누적 평점평균:</strong> {{ stats.overall_gpa }} / 4.5</p>
+            <p><strong>전체 등록 학점 수:</strong> {{ stats.total_credits }} 학점</p>
+        </div>
+
+        <!-- 기능 1: 과목·성적 등록 폼 -->
+        <div class="form-card">
+            <h2>📝 과목·성적 등록</h2>
+            <form action="{{ url_for('add') }}" method="POST">
+                <input type="hidden" name="student_id" value="{{ student_id }}">
+                <input type="hidden" name="name" value="{{ name }}">
+                <input type="hidden" name="year" value="{{ year }}">
+
+                <div class="form-row">
+                    <input type="text" name="name_input" placeholder="과목명 (예: 자료구조)" required>
+                    <input type="text" name="semester" placeholder="수강 학기 (예: 2026년 1학기)" required>
+                    <input type="number" name="credit" placeholder="학점 수 (예: 3)" min="1" required>
+                    <select name="grade" required>
+                        <option value="" disabled selected>성적 등급</option>
+                        {% for g in grades %}
+                            <option value="{{ g }}">{{ g }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-primary">등록하기</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 기능 2 & 3: 과목 조회 및 관리 (학기별 구분 표시) -->
+        <div class="list-card">
+            <h2>📚 과목 조회 및 관리</h2>
+            {% if stats.semesters %}
+                {% for semester, data in stats.semesters.items() %}
+                    <div class="semester-group">
+                        <h3>{{ semester }} (학기 평점: {{ data.gpa }} / 4.5 | 취득 학점: {{ data.credits }}학점)</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>과목명</th>
+                                    <th>학점</th>
+                                    <th>등급</th>
+                                    <th>평점</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for course in data.courses %}
+                                <tr>
+                                    <td>{{ course.name }}</td>
+                                    <td>{{ course.credit }}</td>
+                                    <td>{{ course.grade }}</td>
+                                    <td>{{ course.point }}</td>
+                                    <td>
+                                        <a href="{{ url_for('edit', course_id=course.id, student_id=student_id, name=name, year=year) }}" class="btn-edit">수정</a>
+                                        <form action="{{ url_for('delete', course_id=course.id) }}" method="POST" style="display:inline;">
+                                            <input type="hidden" name="student_id" value="{{ student_id }}">
+                                            <input type="hidden" name="name" value="{{ name }}">
+                                            <input type="hidden" name="year" value="{{ year }}">
+                                            <button type="submit" class="btn-delete" onclick="return confirm('정말 삭제하시겠습니까?');">삭제</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="empty-msg">등록된 과목이 없습니다. 위 폼에서 과목을 추가해주세요.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
