@@ -82,7 +82,8 @@ def quiz():
     return render_template('quiz.html',
                            student_id=student_id,
                            name=name,
-                           year=year)
+                           year=year,
+                           curriculum=CURRICULUM) 
 
 @app.route('/add', methods=['POST'])
 def add():
