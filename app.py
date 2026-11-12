@@ -30,6 +30,18 @@ def scores():
                            stats=stats, 
                            grades=GRADE_POINTS.keys())
 
+@app.route('/quiz')
+def quiz():
+    # 학습 퀴즈 페이지 (학생 정보 유지)
+    student_id = request.args.get('student_id', '')
+    name = request.args.get('name', '')
+    year = request.args.get('year', '')
+
+    return render_template('quiz.html',
+                           student_id=student_id,
+                           name=name,
+                           year=year)
+
 @app.route('/add', methods=['POST'])
 def add():
     student_id = request.form.get('student_id', '')
