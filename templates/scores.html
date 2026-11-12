@@ -14,7 +14,6 @@
             <a href="{{ url_for('index') }}" class="btn-back-main">처음 화면으로</a>
         </div>
 
-        <!-- 플래시 메시지 (예외 처리 및 알림 출력) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flash-messages">
@@ -25,14 +24,13 @@
             {% endif %}
         {% endwith %}
 
-        <!-- 기능 3: 평점평균(GPA) 자동 계산 및 학점 표시 요약 카드 -->
         <div class="summary-card">
             <h2>📊 전체 성적 요약</h2>
             <p><strong>전체 누적 평점평균:</strong> {{ stats.overall_gpa }} / 4.5</p>
             <p><strong>전체 등록 학점 수:</strong> {{ stats.total_credits }} 학점</p>
         </div>
 
-        <!-- 기능 1: 과목·성적 등록 폼 -->
+        <!-- 과목·성적 등록 -->
         <div class="form-card">
             <h2>📝 과목·성적 등록</h2>
             <form action="{{ url_for('add') }}" method="POST">
@@ -41,21 +39,50 @@
                 <input type="hidden" name="year" value="{{ year }}">
 
                 <div class="form-row">
-                    <input type="text" name="name_input" placeholder="과목명 (예: 자료구조)" required>
-                    <input type="text" name="semester" placeholder="수강 학기 (예: 2026년 1학기)" required>
-                    <input type="number" name="credit" placeholder="학점 수 (예: 3)" min="1" required>
+                    <!-- 과목명 선택 드롭다운 -->
+                    <select name="name_input" id="course_select" required>
+                        <option value="" disabled selected>과목 선택</option>
+                        {% for sem, courses in curriculum.items() %}
+                            <optgroup label="{{ sem }}">
+                                {% for c in courses %}
+                                    <option value="{{ c }}" data-credit="{{ course_credits[c] }}">{{ c }} ({{ course_credits[c] }}학점)</option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endfor %}
+                    </select>
+
+                    <!-- 수강 연도 선택 (2016~2036, 기본값 2026) -->
+                    <select name="semester_year" required>
+                        <option value="" disabled>연도 선택</option>
+                        {% for y in range(2016, 2037) %}
+                            <option value="{{ y }}" {% if y == 2026 %}selected{% endif %}>{{ y }}년</option>
+                        {% endfor %}
+                    </select>
+
+                    <!-- 수강 학기 선택 (여름학기, 1학기, 2학기, 겨울학기) -->
+                    <select name="semester_term" required>
+                        <option value="" disabled selected>학기 선택</option>
+                        {% for term in allowed_semesters %}
+                            <option value="{{ term }}">{{ term }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <!-- 자동 입력 및 수정 불가 학점 필드 -->
+                    <input type="number" name="credit" id="credit_input" placeholder="학점 (자동)" readonly required style="background-color: #e9ecef; cursor: not-allowed; width: 80px;">
+
+                    <!-- 성적 등급 선택 -->
                     <select name="grade" required>
                         <option value="" disabled selected>성적 등급</option>
                         {% for g in grades %}
                             <option value="{{ g }}">{{ g }}</option>
                         {% endfor %}
                     </select>
+                    
                     <button type="submit" class="btn-primary">등록하기</button>
                 </div>
             </form>
         </div>
 
-        <!-- 기능 2 & 3: 과목 조회 및 관리 (학기별 구분 표시) -->
         <div class="list-card">
             <h2>📚 과목 조회 및 관리</h2>
             {% if stats.semesters %}
@@ -99,5 +126,13 @@
             {% endif %}
         </div>
     </div>
+
+    <script>
+        document.getElementById('course_select').addEventListener('change', function() {
+            var selectedOption = this.options[this.selectedIndex];
+            var credit = selectedOption.getAttribute('data-credit');
+            document.getElementById('credit_input').value = credit ? credit : '';
+        });
+    </script>
 </body>
 </html>
