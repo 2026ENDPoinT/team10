@@ -6,13 +6,12 @@
 SQL 은 두 DB 에서 같이 동작하도록 '?' 자리표시자로 작성하고, PostgreSQL 에서는 '%s' 로 바꿔 실행한다.
 비밀번호는 해시로만 저장하며, 다른 테이블은 학생을 students.id(user_id)로 참조한다.
 """
+import hashlib
 import json
 import os
 import sqlite3
 import time
 from pathlib import Path
-
-from werkzeug.security import check_password_hash, generate_password_hash
 
 WRONG_ANSWER_LIMIT = 10   # 계정당 저장되는 틀린 문제 수
 CONVERSATION_LIMIT = 3    # 계정당 저장되는 AI 대화 수
@@ -100,10 +99,11 @@ def get_db_connection():
 SCHEMA = [
     '''CREATE TABLE IF NOT EXISTS students (
         id {pk},
-        student_id TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        password_key TEXT NOT NULL,
         name TEXT NOT NULL,
-        year TEXT NOT NULL
+        year TEXT NOT NULL,
+        UNIQUE (student_id, password_key)
     )''',
     '''CREATE TABLE IF NOT EXISTS courses (
         id {pk},
@@ -161,22 +161,36 @@ SCHEMA = [
     'CREATE INDEX IF NOT EXISTS quizzes_owner ON quizzes (owner, created)',
 ]
 
-LEGACY_TABLES = ('students', 'courses', 'wrong_answers', 'chat_conversations')
+# 학생을 참조하는 테이블. 계정 구조가 바뀌면 함께 legacy_* 로 보관한다.
+ACCOUNT_TABLES = ('students', 'courses', 'wrong_answers', 'chat_conversations', 'assignments')
+ACCOUNT_INDEXES = ('courses_user', 'wrong_answers_user', 'chat_conversations_user', 'assignments_owner')
 
 
-def _retire_legacy_sqlite_tables(conn):
-    """예전 구조(비밀번호 평문, (학번, 비밀번호) 기본키)의 로컬 테이블은 지우지 않고 legacy_* 로 이름만 바꾼다."""
-    columns = {row['name'] for row in conn.execute('PRAGMA table_info(students)').fetchall()}
-    if not columns or 'password_hash' in columns:
+def _table_columns(conn, table):
+    if conn.postgres:
+        rows = conn.execute('SELECT column_name AS name FROM information_schema.columns '
+                            'WHERE table_schema = current_schema() AND table_name = ?', (table,)).fetchall()
+    else:
+        rows = conn.execute(f'PRAGMA table_info({table})').fetchall()
+    return {row['name'] for row in rows}
+
+
+def _retire_old_account_tables(conn):
+    """예전 계정 구조(평문 비밀번호, 또는 학번당 계정 하나)의 테이블은 지우지 않고 legacy_* 로 이름만 바꾼다."""
+    columns = _table_columns(conn, 'students')
+    if not columns or 'password_key' in columns:
         return
     suffix = str(int(time.time()))
-    for table in LEGACY_TABLES:
-        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone():
+    for index in ACCOUNT_INDEXES:
+        conn.execute(f'DROP INDEX IF EXISTS {index}')
+    for table in ACCOUNT_TABLES:
+        if _table_columns(conn, table):
             conn.execute(f'ALTER TABLE {table} RENAME TO legacy_{table}_{suffix}')
-    print(f'[database] 예전 구조의 테이블을 legacy_*_{suffix} 로 보관했습니다. 새 구조로 다시 만듭니다.')
+    print(f'[database] 예전 계정 구조의 테이블을 legacy_*_{suffix} 로 보관했습니다. 새 구조로 다시 만듭니다.')
 
 
 def init_db():
+    _password_pepper()  # 배포 환경에서 PASSWORD_PEPPER 가 빠졌으면 시작할 때 바로 알린다
     conn = get_db_connection()
     try:
         with conn:
@@ -185,59 +199,66 @@ def init_db():
                 conn.execute('SELECT pg_advisory_xact_lock(1010)')
                 pk = 'SERIAL PRIMARY KEY'
             else:
-                _retire_legacy_sqlite_tables(conn)
                 pk = 'INTEGER PRIMARY KEY AUTOINCREMENT'
+            _retire_old_account_tables(conn)
             for statement in SCHEMA:
                 conn.execute(statement.format(pk=pk))
     finally:
         conn.close()
 
+# ---------------------------------------------------------------------
+# 계정: (학번, 비밀번호) 조합마다 별도의 계정
+# ---------------------------------------------------------------------
+def _password_pepper():
+    pepper = os.getenv('PASSWORD_PEPPER', '').strip()
+    if pepper:
+        return pepper
+    if using_postgres():
+        raise RuntimeError('PASSWORD_PEPPER 환경변수가 필요합니다. Render의 Environment에 긴 임의 문자열로 추가하세요.')
+    return 'local-development-only'  # 로컬 SQLite 개발용
 
-# ---------------------------------------------------------------------
-# 계정
-# ---------------------------------------------------------------------
+
+def _password_key(student_id, password):
+    """같은 학번·비밀번호면 항상 같은 값이 나오는 키. 평문 비밀번호 대신 이 값을 저장하고 계정을 찾는다.
+    서버 비밀값(PASSWORD_PEPPER)이 없으면 DB만으로는 비밀번호를 알아낼 수 없다."""
+    salt = f'{_password_pepper()}:{student_id}'.encode()
+    return hashlib.scrypt(password.encode(), salt=salt, n=2 ** 14, r=8, p=1, dklen=32).hex()
+
+
+def _is_unique_violation(exc):
+    return isinstance(exc, sqlite3.IntegrityError) or getattr(exc, 'sqlstate', None) == '23505'
+
+
 def _public_student(row):
-    if row is None:
-        return None
     return {'id': row['id'], 'student_id': row['student_id'], 'name': row['name'], 'year': row['year']}
 
 
-def find_student(student_id):
+def get_student(student_id, password):
+    """학번 + 비밀번호 조합의 계정. 없으면 None."""
     conn = get_db_connection()
     try:
-        row = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
+        row = conn.execute('SELECT * FROM students WHERE student_id = ? AND password_key = ?',
+                           (student_id, _password_key(student_id, password))).fetchone()
     finally:
         conn.close()
-    return _public_student(row)
+    return _public_student(row) if row else None
 
 
 def create_student(student_id, password, name, year):
-    """새 계정을 만든다. 같은 학번이 이미 있으면 None."""
+    """새 계정을 만든다. 같은 (학번, 비밀번호) 계정이 이미 있으면 None."""
     conn = get_db_connection()
     try:
         with conn:
             row = conn.execute('''
-                INSERT INTO students (student_id, password_hash, name, year) VALUES (?, ?, ?, ?)
-                ON CONFLICT (student_id) DO NOTHING
+                INSERT INTO students (student_id, password_key, name, year) VALUES (?, ?, ?, ?)
+                ON CONFLICT (student_id, password_key) DO NOTHING
                 RETURNING id
-            ''', (student_id, generate_password_hash(password), name, year)).fetchone()
+            ''', (student_id, _password_key(student_id, password), name, year)).fetchone()
     finally:
         conn.close()
     if row is None:
         return None
     return {'id': row['id'], 'student_id': student_id, 'name': name, 'year': year}
-
-
-def authenticate_student(student_id, password):
-    """학번과 비밀번호가 맞으면 계정 정보, 아니면 None."""
-    conn = get_db_connection()
-    try:
-        row = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
-    finally:
-        conn.close()
-    if row is None or not check_password_hash(row['password_hash'], password):
-        return None
-    return _public_student(row)
 
 
 def update_student_profile(user_id, name, year):
@@ -249,22 +270,33 @@ def update_student_profile(user_id, name, year):
         conn.close()
 
 
-def update_student_password(user_id, new_password):
-    """비밀번호 변경. 결과: 'ok' | 'same' | 'not_found'"""
+def update_student_password(user_id, student_id, new_password):
+    """비밀번호 변경. 결과: 'ok' | 'same' | 'taken' | 'not_found'
+
+    같은 학번의 다른 계정이 이미 쓰는 비밀번호로는 바꿀 수 없다('taken').
+    성적·오답·대화·과제는 user_id 로 연결되어 있으므로 그대로 유지된다.
+    """
+    new_key = _password_key(student_id, new_password)
     conn = get_db_connection()
     try:
         with conn:
-            row = conn.execute('SELECT password_hash FROM students WHERE id = ?', (user_id,)).fetchone()
+            row = conn.execute('SELECT password_key FROM students WHERE id = ? AND student_id = ?',
+                               (user_id, student_id)).fetchone()
             if row is None:
                 return 'not_found'
-            if check_password_hash(row['password_hash'], new_password):
+            if row['password_key'] == new_key:
                 return 'same'
-            conn.execute('UPDATE students SET password_hash = ? WHERE id = ?',
-                         (generate_password_hash(new_password), user_id))
+            if conn.execute('SELECT 1 FROM students WHERE student_id = ? AND password_key = ?',
+                            (student_id, new_key)).fetchone():
+                return 'taken'
+            conn.execute('UPDATE students SET password_key = ? WHERE id = ?', (new_key, user_id))
         return 'ok'
+    except Exception as exc:
+        if _is_unique_violation(exc):  # 확인 직후 다른 요청이 같은 비밀번호 계정을 만든 경우
+            return 'taken'
+        raise
     finally:
         conn.close()
-
 
 # ---------------------------------------------------------------------
 # 성적(과목)

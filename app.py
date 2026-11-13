@@ -8,9 +8,9 @@ from werkzeug.middleware.proxy_fix import ProxyFix   # import 부분에 추가
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from scipy.stats import norm
+from database import (init_db, get_all_courses, get_course, add_course, update_course, delete_course,
+                      get_student, create_student, update_student_profile, update_student_password)
 
-from database import (init_db, get_all_courses, get_course, add_course, update_course, delete_course, find_student,
-                      create_student, authenticate_student, update_student_profile, update_student_password)
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
@@ -164,19 +164,28 @@ def login():
         flash('학년을 선택해주세요.', 'error')
         return redirect(url_for('index'))
 
-    # 새로 만드는 계정만 규칙 검사 (규칙 도입 전에 만든 기존 계정은 그대로 로그인 가능)
-    if get_student(student_id, password) is None and not is_valid_password(password):
-        flash(PASSWORD_RULE_MESSAGE, 'error')
-        return redirect(url_for('index'))
-
-    save_or_update_student(student_id, name, year, password)
-
+    # (학번, 비밀번호) 조합마다 별도의 계정. 처음 쓰는 조합이면 새 계정을 만든다.
     account = get_student(student_id, password)
+    if account is None:
+        if not is_valid_password(password):
+            flash(PASSWORD_RULE_MESSAGE, 'error')
+            return redirect(url_for('index'))
+        account = create_student(student_id, password, name, year)
+        if account is None:  # 같은 조합의 계정이 방금 다른 요청에서 만들어진 경우
+            account = get_student(student_id, password)
+        else:
+            flash('새 성적 셋이 만들어졌습니다. 같은 학번이라도 비밀번호가 다르면 다른 계정입니다.', 'success')
+    if account is None:
+        flash('로그인에 실패했습니다. 다시 시도해주세요.', 'error')
+        return redirect(url_for('index'))
+    update_student_profile(account['id'], name, year)
+
+    # 세션 쿠키에는 비밀번호를 저장하지 않는다 (Flask 세션은 서명만 되고 암호화되지 않음)
     session.clear()
+    session['user_id'] = account['id']
     session['assignment_owner'] = account['id']
     session['assignment_navigation'] = {'student_id': student_id, 'name': name, 'year': year}
     session['student_id'] = student_id
-    session['password'] = password
     session['name'] = name
     session['year'] = year
 
@@ -398,9 +407,12 @@ def change_password():
         flash(PASSWORD_RULE_MESSAGE, 'error')
         return redirect(request.referrer or url_for('scores'))
 
-    result = update_student_password(session['user_id'], new_password)
+    result = update_student_password(session['user_id'], session['student_id'], new_password)
     if result == 'same':
         flash('현재 비밀번호와 다른 비밀번호를 입력해주세요.', 'error')
+        return redirect(request.referrer or url_for('scores'))
+    if result == 'taken':
+        flash('같은 학번에서 이미 사용 중인 비밀번호입니다. 다른 비밀번호를 입력해주세요.', 'error')
         return redirect(request.referrer or url_for('scores'))
     if result == 'not_found':
         session.clear()
