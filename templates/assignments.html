@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ko">
+<html lang="{{ ui_language }}">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>과제 관리 · Team 10</title>
+  <title>{{ t('과제 관리 · Team 10') }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
     .task-card{background:white;border:1px solid #e2e6e9;border-radius:22px;padding:24px;margin:18px 0}
@@ -19,76 +19,77 @@
     .deadline-parts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
     @media(max-width:600px){.deadline-parts{grid-template-columns:repeat(3,minmax(0,1fr))}}
   </style>
+{% include '_language_assets.html' %}
 </head>
 <body class="modern">
 {% set active_page = 'assignments' %}{% include 'island.html' %}
 <main class="container">
-  <h1>📅 과제 관리</h1>
-  <p>하나씩 끝내는 오늘의 할 일. 마감 시간은 한국 시간 기준입니다.</p>
+  <h1>{{ t('📅 과제 관리') }}</h1>
+  <p>{{ t('하나씩 끝내는 오늘의 할 일. 마감 시간은 한국 시간 기준입니다.') }}</p>
   {% include '_assignment_notice.html' %}
-  {% for category, message in get_flashed_messages(with_categories=true) %}<p role="status">{{ message }}</p>{% endfor %}
+  {% for category, message in get_flashed_messages(with_categories=true) %}<p role="status">{{ message|ui_text }}</p>{% endfor %}
   {% macro fields(item=none) %}
   <div class="task-fields">
-    <label>과목<select name="subject" required><option value="">과목 선택</option>
-      {% for subject in subjects %}<option {% if item and item.subject == subject %}selected{% endif %}>{{ subject }}</option>{% endfor %}
+    <label>{{ t('과목') }}<select name="subject" required><option value="">{{ t('과목 선택') }}</option>
+      {% for subject in subjects %}<option value="{{ subject }}" {% if item and item.subject == subject %}selected{% endif %}>{{ subject |ui_text }}</option>{% endfor %}
     </select></label>
-    <label>과제명<input name="title" maxlength="150" required value="{{ item.title if item else '' }}" placeholder="예: 3주차 실습 보고서"></label>
+    <label>{{ t('과제명') }}<input name="title" maxlength="150" required value="{{ item.title if item else '' }}" placeholder="{{ t('예: 3주차 실습 보고서') }}"></label>
     {% set saved = item.deadline if item else '' %}
     {% set saved_year = saved[:4]|int if saved else current_year %}
     <fieldset class="deadline-picker">
-      <legend>마감 날짜·시간 (한국 시간 · {{ saved_year }}년 기준)</legend>
+      <legend>{{ t('마감 날짜·시간 (한국 시간 ·') }} {{ saved_year }}{{ t('년 기준)') }}</legend>
       <div class="deadline-parts">
         <input type="hidden" name="deadline_year" value="{{ saved_year }}">
-        <label>월<select name="deadline_month" required><option value="">MM</option>
-          {% for value in range(1,13) %}<option value="{{ value }}" {% if saved and saved[5:7]|int == value %}selected{% endif %}>{{ value }}월</option>{% endfor %}
+        <label>{{ t('월') }}<select name="deadline_month" required><option value="">MM</option>
+          {% for value in range(1,13) %}<option value="{{ value }}" {% if saved and saved[5:7]|int == value %}selected{% endif %}>{{ value }}{{ '월' if ui_language == 'ko' else '' }}</option>{% endfor %}
         </select></label>
-        <label>일<select name="deadline_day" required><option value="">DD</option>
-          {% for value in range(1,32) %}<option value="{{ value }}" {% if saved and saved[8:10]|int == value %}selected{% endif %}>{{ value }}일</option>{% endfor %}
+        <label>{{ t('일') }}<select name="deadline_day" required><option value="">DD</option>
+          {% for value in range(1,32) %}<option value="{{ value }}" {% if saved and saved[8:10]|int == value %}selected{% endif %}>{{ value }}{{ '일' if ui_language == 'ko' else '' }}</option>{% endfor %}
         </select></label>
-        <label>시간<input type="time" name="deadline_time" required step="60" value="{{ saved[11:16] if saved else '' }}"></label>
+        <label>{{ t('시간') }}<input type="time" name="deadline_time" required step="60" value="{{ saved[11:16] if saved else '' }}"></label>
       </div>
     </fieldset>
-    <label>중요도<select name="priority">{% for value,text in [(3,'높음'),(2,'보통'),(1,'낮음')] %}
-      <option value="{{ value }}" {% if (item and item.priority == value) or (not item and value == 2) %}selected{% endif %}>{{ text }}</option>
+    <label>{{ t('중요도') }}<select name="priority">{% for value,text in [(3,'높음'),(2,'보통'),(1,'낮음')] %}
+      <option value="{{ value }}" {% if (item and item.priority == value) or (not item and value == 2) %}selected{% endif %}>{{ text |ui_text }}</option>
     {% endfor %}</select></label>
   </div>
   {% endmacro %}
   <section class="task-card" style="background:#fff8df">
-    <h2>새 과제 등록</h2>
+    <h2>{{ t('새 과제 등록') }}</h2>
     <form method="post" action="{{ url_for('assignments.save') }}">
       <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">
-      {{ fields() }}<button class="btn-primary">과제 등록</button>
+      {{ fields() }}<button class="btn-primary">{{ t('과제 등록') }}</button>
     </form>
   </section>
   {% for title,items in [('할 일',pending),('완료한 과제',completed)] %}
   <section id="{{ 'pending' if loop.first else 'completed' }}">
-    <h2>{{ title }} <small>{{ items|length }}개</small></h2>
-    {% if loop.first %}<p class="task-meta">마감이 가까운 순 · 같은 마감이면 중요도 높은 순</p>{% endif %}
+    <h2>{{ title|ui_text }} <small>{{ items|length }}{{ t('개') }}</small></h2>
+    {% if loop.first %}<p class="task-meta">{{ t('마감이 가까운 순 · 같은 마감이면 중요도 높은 순') }}</p>{% endif %}
     {% for item in items %}
     <article class="task-card {{ 'task-done' if item.completed else '' }}">
       <p class="task-meta">{{ item.subject }}</p><h3>{{ item.title }}</h3>
       {% if item.completed %}
-      <span class="task-badge">✓ 제출 완료</span>
+      <span class="task-badge">{{ t('✓ 제출 완료') }}</span>
       {% else %}
-      <span class="task-badge" data-task-deadline="{{ item.deadline }}+09:00">{{ deadline_label(item.deadline) }}</span>
+      <span class="task-badge" data-task-deadline="{{ item.deadline }}+09:00">{{ deadline_label(item.deadline)|ui_text }}</span>
       {% endif %}
-      <p>마감 {{ item.deadline|replace('T',' ') }} · 중요도 {{ {1:'낮음',2:'보통',3:'높음'}[item.priority] }}</p>
-      <details><summary>과제 수정</summary>
+      <p>{{ t('마감') }} {{ item.deadline|replace('T',' ') }} {{ t('· 중요도') }} {{ {1:'낮음',2:'보통',3:'높음'}[item.priority]|ui_text }}</p>
+      <details><summary>{{ t('과제 수정') }}</summary>
         <form method="post" action="{{ url_for('assignments.save',item_id=item.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">{{ fields(item) }}<button class="btn-primary">변경 저장</button>
+          <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">{{ fields(item) }}<button class="btn-primary">{{ t('변경 저장') }}</button>
         </form>
       </details>
       <div class="task-actions">
         <form method="post" action="{{ url_for('assignments.change',item_id=item.id,action='restore' if item.completed else 'complete') }}">
           <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">
-          <button class="btn-primary">{{ '할 일로 되돌리기' if item.completed else '✓ 제출 완료' }}</button>
+          <button class="btn-primary">{{ t('할 일로 되돌리기') if item.completed else t('✓ 제출 완료') }}</button>
         </form>
-        <form method="post" action="{{ url_for('assignments.change',item_id=item.id,action='delete') }}" onsubmit="return confirm('이 과제를 삭제할까요?');">
-          <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}"><button class="task-danger">삭제</button>
+        <form method="post" action="{{ url_for('assignments.change',item_id=item.id,action='delete') }}" onsubmit="return confirm(uiText('이 과제를 삭제할까요?'));">
+          <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}"><button class="task-danger">{{ t('삭제') }}</button>
         </form>
       </div>
     </article>
-    {% else %}<p class="task-empty">아직 과제가 없습니다.</p>{% endfor %}
+    {% else %}<p class="task-empty">{{ t('아직 과제가 없습니다.') }}</p>{% endfor %}
   </section>
   {% endfor %}
 </main>

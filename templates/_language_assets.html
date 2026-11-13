@@ -1,0 +1,8 @@
+<style>
+ .site-language-bar{display:flex;justify-content:flex-end;max-width:1200px;margin:8px auto;padding:0 16px;position:relative;z-index:1100}
+ .island .site-language-bar{margin:0;padding:0;position:static;flex-shrink:0}
+ .site-language-button{font:600 12px system-ui,sans-serif;border:1px solid #ccd5cf;border-radius:20px;background:#fff;color:#244638;padding:6px 12px;cursor:pointer;white-space:nowrap}
+ .site-language-button:hover{background:#edf4ef}.site-language-button:focus-visible{outline:2px solid #2861db;outline-offset:3px}
+</style>
+<script>window.UI_LANGUAGE = {{ ui_language|tojson }}; window.UI_TRANSLATIONS = {{ ui_translations|tojson }};</script>
+<script src="{{ url_for('static', filename='js/language.js') }}"></script>

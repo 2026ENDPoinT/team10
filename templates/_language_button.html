@@ -1,0 +1,5 @@
+<div class="site-language-bar">
+  <button type="button" class="site-language-button" onclick="switchSiteLanguage()"
+          aria-label="{{ '한국어로 전환' if ui_language == 'en' else 'Switch to English' }}"
+          lang="{{ 'ko' if ui_language == 'en' else 'en' }}">🌐 {{ '한국어' if ui_language == 'en' else 'ENG' }}</button>
+</div>

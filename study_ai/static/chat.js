@@ -1,3 +1,4 @@
+const chatText = value => typeof uiText === 'function' ? uiText(value) : value;
 (() => {
   'use strict';
   const byId = id => document.getElementById(id);
@@ -46,7 +47,7 @@
       card.append(link, channel); section.append(card);
     }
     if (videos.search_url) {
-      const search = linkToYouTube(videos.search_url, '유튜브에서 관련 강의 찾기 ↗');
+      const search = linkToYouTube(videos.search_url, chatText('유튜브에서 관련 강의 찾기 ↗'));
       if (search) section.append(search);
     }
     if (videos.notice) {
@@ -67,7 +68,7 @@
       const li = document.createElement('li'); li.textContent = q.question;
       byId('context-list').append(li);
     });
-    input.value = context ? '이 퀴즈 결과를 바탕으로 잘한 부분과 복습할 부분을 근거와 함께 설명해 주세요.' : '';
+    input.value = context ? chatText('이 퀴즈 결과를 바탕으로 잘한 부분과 복습할 부분을 근거와 함께 설명해 주세요.') : '';
   }
   byId('sample').addEventListener('click', () => setContext({
     subject: 'Introduction to Programming 1 (sample)',
@@ -88,7 +89,7 @@
     busy = true; showError('');
     const controls = ['send', 'sample', 'clear-context', 'new-chat', 'teaching-mode', 'language', 'level', 'video-duration'];
     controls.forEach(id => { byId(id).disabled = true; }); input.disabled = true;
-    byId('status').textContent = '답변을 준비하고 있어요…';
+    byId('status').textContent = chatText('답변을 준비하고 있어요…');
     const pending = addMessage('user', message);
     const recent = history.slice(-12);
     while (recent.reduce((total, item) => total + item.content.length, 0) > 30000) recent.splice(0, 2);
@@ -110,7 +111,7 @@
       pending.remove(); showError(err.message || 'Connection failed. Check that the server is running.');
     } finally {
       busy = false; controls.forEach(id => { byId(id).disabled = false; }); input.disabled = false;
-      byId('status').textContent = 'Ctrl + Enter로 보내기'; input.focus();
+      byId('status').textContent = chatText('Ctrl + Enter로 보내기'); input.focus();
     }
   });
   // After merging, the existing quiz sends context on the SAME origin using the bridge.

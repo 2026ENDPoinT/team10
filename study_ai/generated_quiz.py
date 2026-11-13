@@ -84,6 +84,8 @@ def generate():
                   '실제 강의계획서는 없으므로 과목의 일반적인 기초 개념을 사용하세요. '
                   '프로그래밍입문(1)/Introduction to Programming 1은 기존 문제은행에 맞춰 Python을 기본으로 합니다. '
                   '실습/프로젝트 과목은 일반적인 프로젝트 수행 개념을 다루세요. JSON만 출력하세요.')
+        if request.cookies.get('ui_language') == 'en':
+            prompt += '\nOverride the output language: write all questions, choices and explanations in English.'
         response = request_groq({'model': current_app.config['GROQ_MODEL'],
             'messages': [{'role': 'system', 'content': prompt}, {'role': 'user', 'content': json.dumps(
                 {'subject': subject, 'count': count, 'topic': topic}, ensure_ascii=False)}],

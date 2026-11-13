@@ -11,3 +11,8 @@ assert.equal(label(deadline, at('2026-11-12T23:59')), 'D-1');
 assert.equal(label(deadline, at('2026-11-14T00:00')), '마감 1일 지남');
 assert.equal(label('2026-12-01T00:20+09:00', at('2026-12-01T00:00')), '오늘 마감 · 20분 후 마감');
 console.log('Countdown: minute/hour display, deadline boundary, and Korean midnight passed.');
+
+global.window = {UI_LANGUAGE: 'en'};
+assert.equal(label(deadline, at('2026-11-13T10:00')), 'Due today · 20m left');
+assert.equal(label(deadline, at('2026-11-12T23:59')), 'Due in 1 day(s)');
+delete global.window;

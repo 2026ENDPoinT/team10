@@ -6,28 +6,81 @@
   - 로그인 폼의 name / id 는 기존과 동일하게 유지 (/login 라우트와 호환)
 #}
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ ui_language }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>대학생 성적 관리 프로그램</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body class="modern landing" id="top">
 
-    <!-- 다이나믹 아일랜드 (랜딩 전용) -->
-    <div class="island-wrap">
-        <nav class="island" id="island">
-            <a class="island-logo" href="#top" title="맨 위로" style="text-decoration:none;">🎓</a>
-            <a class="island-btn" href="#top">홈</a>
-            <a class="island-btn" href="#details">기능 소개</a>
-            <span class="island-divider"></span>
-            {% if session.get('student_id') %}
-                <a class="island-btn active" href="{{ url_for('scores') }}">📊 내 성적으로</a>
-            {% else %}
-                <a class="island-btn active" href="#login">🔐 로그인</a>
+    <title>{{ t('대학생 성적 관리 프로그램 - 로그인') }}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% include '_language_assets.html' %}
+</head>
+
+<body>
+{% include '_language_button.html' %}
+    <div class="container login-container">
+        <h1>{{ t('🎓 대학생 성적 관리 프로그램') }}</h1>
+        <p class="desc">{{ t('학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.') }}<br>{{ t('(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)') }}</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash-messages">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message|ui_text }}</li>
+                    {% endfor %}
+                </ul>
             {% endif %}
-        </nav>
+        {% endwith %}
+
+        <div class="form-card">
+            <form action="{{ url_for('login') }}" method="POST">
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label for="student_id" style="display:block; margin-bottom:5px; font-weight:bold;">{{ t('학번') }}</label>
+                    <input type="text" id="student_id" name="student_id"
+                           placeholder="{{ t('예: 26101167 (8자리 숫자, 0 시작 불가)') }}"
+                           pattern="[1-9][0-9]{7}"
+                           maxlength="8"
+                           inputmode="numeric"
+                           required
+                           style="width:100%; padding:10px; box-sizing:border-box;">
+                </div>
+
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label for="name" style="display:block; margin-bottom:5px; font-weight:bold;">{{ t('이름') }}</label>
+                    <input type="text" id="name" name="name" placeholder="{{ t('예: 김준호') }}" required style="width:100%; padding:10px; box-sizing:border-box;">
+                </div>
+
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label for="year" style="display:block; margin-bottom:5px; font-weight:bold;">{{ t('학년') }}</label>
+                    <select id="year" name="year" required style="width:100%; padding:10px;">
+                        <option value="" disabled selected>{{ t('학년을 선택하세요') }}</option>
+                        <option value="1">{{ t('1학년') }}</option>
+                        <option value="2">{{ t('2학년') }}</option>
+                        <option value="3">{{ t('3학년') }}</option>
+                        <option value="4">{{ t('4학년') }}</option>
+                    </select>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label for="password" style="display:block; margin-bottom:5px; font-weight:bold;">{{ t('비밀번호') }}</label>
+                    <!-- 비밀번호 입력란과 보기 버튼을 감싸는 컨테이너 -->
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input type="password" id="password" name="password"
+                               placeholder="{{ t('특수문자(!@#$%^&*) 포함 필수') }}"
+                               required
+                               style="width:100%; padding:10px; padding-right: 45px; box-sizing:border-box;">
+                        <button type="button" id="togglePassword"
+                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 18px;"
+                                title="{{ t('비밀번호 표시/숨기기') }}">(-)</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
+                    {{ t('로그인 및 성적 관리 시작') }}
+                </button>
+            </form>
+        </div>
+
     </div>
 
     <main class="landing-main">
@@ -173,6 +226,10 @@
         togglePassword.addEventListener('click', function () {
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
+
+
+            // 아이콘 변경 (눈 모양 (-) / 가려진 눈 모양 (0))
+
             this.textContent = type === 'password' ? '(-)' : '(0)';
         });
 
