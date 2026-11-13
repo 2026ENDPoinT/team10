@@ -45,13 +45,10 @@
             <p class="card-desc">{{ t('AI 문제는 과목의 일반 학습 내용으로 생성됩니다. 실제 수업 범위와 다를 수 있고 정답에 오류가 있을 수 있습니다.') }}</p>
 
             <div class="field-grid">
-                <div class="field">
-                    <label for="quiz-source">{{ t('문제 출처') }}</label>
-                    <select id="quiz-source"><option value="ai">{{ t('AI 새 문제 (1~5문제)') }}</option><option value="bank">{{ t('기존 문제은행 (1~10문제)') }}</option></select>
-                </div>
-                <div class="field">
-                    <label for="quiz-topic">{{ t('학습 주제 (선택)') }}</label>
-                    <input id="quiz-topic" maxlength="200" placeholder="{{ t('예: Python 반복문, 행렬 곱셈, SQL JOIN') }}">
+                <div class="field span-all">
+                    <label for="quiz-topic">{{ t('학습 주제 (필수)') }}</label>
+                    <!-- 학습 주제: 공백 제외 1글자 이상 필수 (quiz.js 와 서버에서도 다시 확인) -->
+                    <input id="quiz-topic" maxlength="200" required minlength="1" placeholder="{{ t('해당 교과목에 대한 학습 주제를 입력하세요') }}">
                 </div>
                 <div class="field">
                     <label for="quiz-subject">{{ t('과목 선택') }}</label>
@@ -68,11 +65,11 @@
                     </select>
                 </div>
                 <div class="field">
-                    <label for="quiz-count">{{ t('문제 수 (1~10)') }}</label>
-                    <!-- 문제 수: 1 ~ 10 -->
+                    <label for="quiz-count">{{ t('문제 수 (1~5)') }}</label>
+                    <!-- 문제 수: AI 문제 1 ~ 5 -->
                     <select id="quiz-count">
-                        <option value="" disabled selected>{{ t('문제 수 (1~10)') }}</option>
-                        {% for n in range(1, 11) %}
+                        <option value="" disabled selected>{{ t('문제 수 (1~5)') }}</option>
+                        {% for n in range(1, 6) %}
                             <option value="{{ n }}">{{ n }}{{ t('문제') }}</option>
                         {% endfor %}
                     </select>

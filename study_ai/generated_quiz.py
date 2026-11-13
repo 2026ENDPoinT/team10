@@ -68,6 +68,9 @@ def generate():
         topic = data.get('topic', '')
         if not isinstance(topic, str) or len(topic) > 200:
             raise ValueError('학습 주제는 200자 이내로 입력해 주세요.')
+        topic = topic.strip()
+        if len(topic) < 1:
+            raise ValueError('학습 주제를 한 글자 이상 입력해 주세요.')
         if current_app.config['AI_MODE'] != 'groq':
             raise TutorError('AI 퀴즈는 AI_MODE=groq 설정이 필요합니다.', 503)
         owner = session.setdefault('ai_quiz_owner', secrets.token_urlsafe(24))

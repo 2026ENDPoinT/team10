@@ -26,7 +26,7 @@ class GeneratedQuizTests(unittest.TestCase):
         with patch('study_ai.generated_quiz.request_groq', return_value={'choices': [{'message': {
                 'content': json.dumps({'questions': [self.question] if questions is None else questions})}}],
                 'usage': {'total_tokens': 500}}) as provider:
-            response = self.client.post('/ai/api/quiz/generate', json={'subject': '선형대수학', 'count': 1})
+            response = self.client.post('/ai/api/quiz/generate', json={'subject': '선형대수학', 'count': 1, 'topic': '행렬 곱셈'})
         return response, provider
 
     def test_curriculum_generation_grading_and_session_ownership(self):
@@ -48,12 +48,14 @@ class GeneratedQuizTests(unittest.TestCase):
         other = app.test_client().post('/ai/api/quiz/grade', json={'quiz_id': quiz_id, 'answers': [1]})
         self.assertEqual(other.status_code, 404)
         self.assertEqual(self.client.post('/ai/api/quiz/grade', json={'quiz_id': quiz_id, 'answers': [True]}).status_code, 400)
-        self.assertEqual(self.client.post('/ai/api/quiz/generate', json={'subject':'선형대수학','count':1}).status_code,429)
+        self.assertEqual(self.client.post('/ai/api/quiz/generate', json={'subject':'선형대수학','count':1,'topic':'행렬'}).status_code,429)
 
     def test_invalid_requests_never_call_provider(self):
         with patch('study_ai.generated_quiz.request_groq') as provider:
             for data in [{'subject':'fake', 'count':1}, {'subject':'선형대수학', 'count':6},
-                         {'subject':'선형대수학', 'count':True}, {'subject':'선형대수학', 'count':1, 'topic':'x'*201}]:
+                         {'subject':'선형대수학', 'count':True}, {'subject':'선형대수학', 'count':1, 'topic':'x'*201},
+                         {'subject':'선형대수학', 'count':1}, {'subject':'선형대수학', 'count':1, 'topic':''},
+                         {'subject':'선형대수학', 'count':1, 'topic':'   '}]:
                 self.assertEqual(self.client.post('/ai/api/quiz/generate', json=data).status_code,400)
             self.assertEqual(self.client.post('/ai/api/quiz/generate', json={}, headers={'Origin':'https://other.test'}).status_code,403)
             provider.assert_not_called()
