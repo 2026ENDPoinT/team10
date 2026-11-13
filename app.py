@@ -1,33 +1,16 @@
 import re
-import os
-import secrets
-from pathlib import Path
-from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-from study_ai import init_study_ai
-from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course
-
+from flask import Flask, render_template, request, redirect, url_for, flash
+from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student
 from gpa_calculator import GRADE_POINTS, calculate_gpa
+from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 
-# This local app uses its own settings even when VS Code inherits older values.
-load_dotenv(Path(__file__).with_name('.env'), override=True)
+
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
-app.config.update(AI_MODE=os.getenv('AI_MODE', 'groq'), STUDY_BACK_ENDPOINT='scores',
-                  MAX_CONTENT_LENGTH=128 * 1024)
-init_study_ai(app)
+app.secret_key = 'super_secret_key'
 
-
-@app.before_request
-def remember_study_navigation():
-    # Local navigation only. Student identity is never added to AI requests.
-    if request.endpoint in ('scores', 'quiz'):
-        student_id = request.args.get('student_id', '')
-        if re.fullmatch(r'[1-9][0-9]{7}', student_id):
-            session['study_navigation'] = {'student_id': student_id,
-                'name': request.args.get('name', '')[:100], 'year': request.args.get('year', '')[:10]}
 
 init_db()
+init_study_ai(app)  # [추가] AI 튜터 블루프린트 등록
 
 COURSE_CREDITS = {
     "프로그래밍입문(1)": 3, "Introduction to Programming 1": 3,
@@ -66,10 +49,6 @@ CURRICULUM = {
 
 ALLOWED_SEMESTERS = ["여름학기", "1학기", "2학기", "겨울학기"]
 
-from study_ai.generated_quiz import init_generated_quiz
-init_generated_quiz(app, CURRICULUM)
-
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -85,37 +64,31 @@ def login():
         flash('학번은 0으로 시작하지 않는 8자리 숫자여야 합니다.', 'error')
         return redirect(url_for('index'))
 
-    if not re.search(r'[!@#$%^&*]', password):
-        flash('비밀번호는 특수문자(!@#$%^&*) 중 하나 이상을 포함해야 합니다.', 'error')
+    if not name:
+        flash('이름을 입력해주세요.', 'error')
         return redirect(url_for('index'))
 
-    # 로그인 시 입력한 이름과 학년으로 DB 정보를 갱신하거나 새로 저장
+    if not year:
+        flash('학년을 선택해주세요.', 'error')
+        return redirect(url_for('index'))
+
+    if not re.search(r'[!@#$%^&*]', password):
+        flash('비밀번호는 특수문자(!@#$%^&*)를 포함해야 합니다.', 'error')
+        return redirect(url_for('index'))
+
     save_or_update_student(student_id, name, year, password)
-
-    # 세션에 최신 정보 반영
-    session['student_id'] = student_id
-    session['password'] = password
-    session['name'] = name
-    session['year'] = year
-
-    return redirect(url_for('scores'))
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('성공적으로 로그아웃되었습니다.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('scores', student_id=student_id, name=name, year=year, password=password))
 
 @app.route('/scores')
 def scores():
-    if 'student_id' not in session or 'password' not in session:
-        flash('로그인이 필요합니다.', 'error')
-        return redirect(url_for('index'))
+    student_id = request.args.get('student_id', '').strip()
+    name = request.args.get('name', '').strip()
+    year = request.args.get('year', '').strip()
+    password = request.args.get('password', '').strip()
 
-    student_id = session['student_id']
-    password = session['password']
-    name = session['name']
-    year = session['year']
+    if not re.match(r'^[1-9][0-9]{7}$', student_id):
+        flash('학번은 0으로 시작하지 않는 8자리 숫자여야 합니다.', 'error')
+        return redirect(url_for('index'))
 
     courses = get_all_courses(student_id, password)
     stats = calculate_gpa(courses)
@@ -132,7 +105,6 @@ def scores():
 
 @app.route('/quiz')
 def quiz():
-    # 학습 퀴즈 페이지 (학생 정보 유지)
     student_id = request.args.get('student_id', '')
     name = request.args.get('name', '')
     year = request.args.get('year', '')
@@ -145,11 +117,10 @@ def quiz():
 
 @app.route('/add', methods=['POST'])
 def add():
-    if 'student_id' not in session or 'password' not in session:
-        return redirect(url_for('index'))
+    student_id = request.form.get('student_id', '')
+    name_val = request.form.get('name', '')
+    year = request.form.get('year', '')
 
-    student_id = session['student_id']
-    password = session['password']
     course_name = request.form.get('name_input', '').strip()
     sel_year = request.form.get('semester_year', '').strip()
     sel_sem = request.form.get('semester_term', '').strip()
@@ -157,40 +128,41 @@ def add():
 
     if not course_name or course_name not in COURSE_CREDITS:
         flash('올바른 과목을 선택해주세요.', 'error')
-        return redirect(url_for('scores'))
+        return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
     if not sel_year or not sel_sem or sel_sem not in ALLOWED_SEMESTERS:
         flash('수강 연도와 올바른 학기를 선택해주세요.', 'error')
-        return redirect(url_for('scores'))
+        return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
     semester = f"{sel_year}년 {sel_sem}"
 
-    existing_courses = get_all_courses(student_id, password)
+    existing_courses = get_all_courses(student_id)
     for c in existing_courses:
         if c['name'] == course_name:
             flash(f"이미 등록된 과목입니다: '{course_name}' ({c['semester']})", 'error')
-            return redirect(url_for('scores'))
+            return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
     if grade not in GRADE_POINTS:
         flash('올바른 성적 등급을 선택해주세요.', 'error')
-        return redirect(url_for('scores'))
+        return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
     credit = COURSE_CREDITS[course_name]
     point = GRADE_POINTS[grade]
     
-    add_course(student_id, password, course_name, semester, credit, grade, point)
+    add_course(student_id, course_name, semester, credit, grade, point)
     flash('과목이 성공적으로 등록되었습니다.', 'success')
-    return redirect(url_for('scores'))
+    return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
 @app.route('/edit/<int:course_id>', methods=['GET', 'POST'])
 def edit(course_id):
-    if 'student_id' not in session or 'password' not in session:
+    course = get_course_by_id(course_id)
+    if not course:
+        flash('존재하지 않는 과목입니다.', 'error')
         return redirect(url_for('index'))
 
-    course = get_course_by_id(course_id)
-    if not course or course['student_id'] != session['student_id'] or course['password'] != session['password']:
-        flash('존재하지 않거나 권한이 없는 과목입니다.', 'error')
-        return redirect(url_for('scores'))
+    student_id = request.args.get('student_id', '') or request.form.get('student_id', '')
+    name = request.args.get('name', '') or request.form.get('name', '')
+    year = request.args.get('year', '') or request.form.get('year', '')
 
     curr_year = "2026"
     curr_term = "1학기"
@@ -207,45 +179,42 @@ def edit(course_id):
 
         if not c_name or c_name not in COURSE_CREDITS:
             flash('올바른 과목을 선택해주세요.', 'error')
-            return redirect(url_for('edit', course_id=course_id))
+            return redirect(url_for('edit', course_id=course_id, student_id=student_id, name=name, year=year))
 
         if not sel_year or not sel_sem or sel_sem not in ALLOWED_SEMESTERS:
             flash('수강 연도와 올바른 학기를 선택해주세요.', 'error')
-            return redirect(url_for('edit', course_id=course_id))
+            return redirect(url_for('edit', course_id=course_id, student_id=student_id, name=name, year=year))
 
         semester = f"{sel_year}년 {sel_sem}"
 
-        existing_courses = get_all_courses(session['student_id'], session['password'])
+        existing_courses = get_all_courses(student_id)
         for c in existing_courses:
             if c['id'] != course_id and c['name'] == c_name:
                 flash(f"이미 등록된 과목입니다: '{c_name}' ({c['semester']})", 'error')
-                return redirect(url_for('edit', course_id=course_id))
+                return redirect(url_for('edit', course_id=course_id, student_id=student_id, name=name, year=year))
 
         if grade not in GRADE_POINTS:
             flash('올바른 성적 등급을 선택해주세요.', 'error')
-            return redirect(url_for('edit', course_id=course_id))
+            return redirect(url_for('edit', course_id=course_id, student_id=student_id, name=name, year=year))
 
         credit = COURSE_CREDITS[c_name]
         point = GRADE_POINTS[grade]
         
         update_course(course_id, c_name, semester, credit, grade, point)
         flash('과목 정보가 수정되었습니다.', 'success')
-        return redirect(url_for('scores'))
+        return redirect(url_for('scores', student_id=student_id, name=name, year=year))
 
-    return render_template('edit.html', course=course, grades=GRADE_POINTS.keys(), curriculum=CURRICULUM, course_credits=COURSE_CREDITS, allowed_semesters=ALLOWED_SEMESTERS, curr_year=curr_year, curr_term=curr_term)
+    return render_template('edit.html', course=course, grades=GRADE_POINTS.keys(), student_id=student_id, name=name, year=year, curriculum=CURRICULUM, course_credits=COURSE_CREDITS, allowed_semesters=ALLOWED_SEMESTERS, curr_year=curr_year, curr_term=curr_term)
 
 @app.route('/delete/<int:course_id>', methods=['POST'])
 def delete(course_id):
-    if 'student_id' not in session or 'password' not in session:
-        return redirect(url_for('index'))
+    student_id = request.form.get('student_id', '')
+    name = request.form.get('name', '')
+    year = request.form.get('year', '')
 
-    course = get_course_by_id(course_id)
-    if course and course['student_id'] == session['student_id'] and course['password'] == session['password']:
-        delete_course(course_id)
-        flash('과목이 삭제되었습니다.', 'success')
-    
-    return redirect(url_for('scores'))
+    delete_course(course_id)
+    flash('과목이 삭제되었습니다.', 'success')
+    return redirect(url_for('scores', student_id=student_id, name=name, year=year))
 
 if __name__ == '__main__':
-
-    app.run(host='127.0.0.1', port=int(os.getenv('PORT', '5002')), debug=False)
+    app.run(debug=True)
