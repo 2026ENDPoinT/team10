@@ -14,6 +14,7 @@
         <a class="island-btn {% if active_page == 'predict' %}active{% endif %}"
            href="{{ url_for('predict') }}">🎯 예측</a>
 
+        <a class="island-btn {% if active_page == 'assignments' %}active{% endif %}" href="{{ url_for('assignments.index') }}">📅 과제</a>
         <span class="island-divider"></span>
 
         <div class="island-profile" title="현재 로그인한 학적 정보">

@@ -1,25 +1,23 @@
 import math
 import re
+import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from scipy.stats import norm
-from database import (
-    init_db, save_or_update_student, get_all_courses, 
-    get_course_by_id, add_course, update_course, delete_course, 
-    update_student_password
-)
 
+from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student, get_student, get_db_connection
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
+from assignments import init_assignments
 
 
 load_dotenv(Path(__file__).with_name('.env'), override=True)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 128 * 1024
-app.secret_key = 'super_secret_key'
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
 
 
 init_db()
@@ -63,6 +61,7 @@ CURRICULUM = {
 ALLOWED_SEMESTERS = ["여름학기", "1학기", "2학기", "겨울학기"]
 
 init_generated_quiz(app, CURRICULUM)
+init_assignments(app, CURRICULUM)
 
 @app.route('/')
 def index():
@@ -93,6 +92,12 @@ def login():
 
     save_or_update_student(student_id, name, year, password)
 
+    account = get_student(student_id, password)
+    session.clear()
+    session['assignment_owner'] = account['id']
+    session['assignment_navigation'] = {'student_id': student_id, 'name': name, 'year': year}
+    return redirect(url_for('scores', student_id=student_id, name=name, year=year, password=password))
+
 
     session['student_id'] = student_id
     session['password'] = password
@@ -114,10 +119,16 @@ def scores():
         flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
 
-    student_id = session['student_id']
-    password = session['password']
-    name = session.get('name', '')
-    year = session.get('year', '')
+
+    if not password and session.get('assignment_owner'):
+        conn = get_db_connection()
+        try:
+            account = conn.execute('SELECT password FROM students WHERE id=? AND student_id=?',
+                (session['assignment_owner'], student_id)).fetchone()
+            if account:
+                password = account['password']
+        finally:
+            conn.close()
 
     courses = get_all_courses(student_id, password)
     stats = calculate_gpa(courses)
