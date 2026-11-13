@@ -112,6 +112,37 @@
             </form>
         </section>
 
+        <!-- 등록한 과목 목록 (성적 등록 칸 아래, 그래프 위) -->
+        <section class="list-card">
+            <h2>{{ t('📚 등록한 과목') }} <span class="chip chip-blue">{{ registered_courses|length }}{{ t('개') }}</span></h2>
+            {% if registered_courses %}
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>{{ t('과목명') }}</th>
+                                <th>{{ t('수강 연도·학기') }}</th>
+                                <th>{{ t('학점') }}</th>
+                                <th>{{ t('성적 등급') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for course in registered_courses %}
+                            <tr>
+                                <td>{{ course.name|ui_text }}</td>
+                                <td>{{ course.semester|ui_text }}</td>
+                                <td>{{ course.credit }}</td>
+                                <td><strong>{{ course.grade }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="empty-msg">{{ t('아직 등록한 과목이 없습니다. 위에서 과목을 등록해 보세요.') }}</p>
+            {% endif %}
+        </section>
+
         <!-- 성적 추이 그래프 -->
         <section class="list-card chart-card">
             <h2>{{ t('📈 성적 추이 그래프') }}</h2>
@@ -126,12 +157,8 @@
 
     {% include '_footer.html' %}
 
-    {% set chart_data = [] %}
-    {% for semester, data in stats.semesters.items() %}
-        {% set _ = chart_data.append({'semester': semester, 'gpa': data.gpa}) %}
-    {% endfor %}
     <script>
-        window.SEMESTER_GPA = JSON.parse('{{ chart_data|tojson }}');
+        window.SEMESTER_GPA = {{ chart_data|tojson }};
         window.OVERALL_GPA = Number('{{ stats.overall_gpa }}');
 
         document.getElementById('course_select').addEventListener('change', function () {

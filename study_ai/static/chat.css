@@ -59,7 +59,6 @@
 
 .shell .link-button { border: 0; background: transparent; color: var(--blue-600); font-size: 13px; }
 
-.shell .back-link { color: var(--blue-600); font-weight: 600; }
 
 .chat-panel {
   display: flex;
@@ -213,3 +212,38 @@
 @media (prefers-reduced-motion: no-preference) {
   #messages { scroll-behavior: smooth; }
 }
+
+/* 저장된 대화 (퀴즈 학습 자료 아래) */
+.shell .saved-chats { margin-top: 16px; }
+.shell #saved-chats-count { padding: 2px 10px; border-radius: 999px; background: var(--blue-100); color: var(--blue-700); font-size: 13px; }
+.shell .saved-chats-note,
+.shell .saved-chats-empty { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.shell .saved-chats-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.shell .saved-chats-list li { display: flex; align-items: stretch; gap: 6px; }
+
+.shell .saved-chat-open {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  text-align: left;
+}
+
+.shell .saved-chat-open:hover { border-color: var(--blue-200); background: var(--blue-50); }
+.shell .saved-chat-open strong { display: block; overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.shell .saved-chat-open span { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.shell .saved-chats-list li.active .saved-chat-open { border-color: var(--blue); background: var(--blue-50); }
+
+.shell .saved-chat-delete {
+  flex-shrink: 0;
+  width: 34px;
+  border: 0;
+  border-radius: 12px;
+  background: #fff1f1;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.shell .saved-chat-delete:hover { background: #ffe1e1; }

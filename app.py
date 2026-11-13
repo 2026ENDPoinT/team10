@@ -14,6 +14,7 @@ from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
 from assignments import init_assignments
 from localization import init_localization
+from study_records import init_study_records
 
 
 load_dotenv(Path(__file__).with_name('.env'), override=True)
@@ -70,12 +71,24 @@ PASSWORD_SPECIAL_CHARS = re.compile(r'[!@#$%^&*]')
 PASSWORD_RULE_MESSAGE = '비밀번호는 5~20자이며 특수문자(!@#$%^&*)를 1개 이상 포함해야 합니다.'
 
 
+TERM_ORDER = {'1학기': 1, '여름학기': 2, '2학기': 3, '겨울학기': 4}
+
+
+def semester_sort_key(semester):
+    """'2026년 1학기' -> (2026, 1). 형식이 다르면 맨 뒤로."""
+    match = re.match(r'^(\d{4})년\s*(.+)$', semester or '')
+    if not match:
+        return (0, 0)
+    return (int(match.group(1)), TERM_ORDER.get(match.group(2), 9))
+
+
 def is_valid_password(password):
     return (PASSWORD_MIN_LENGTH <= len(password) <= PASSWORD_MAX_LENGTH
             and PASSWORD_SPECIAL_CHARS.search(password) is not None)
 
 init_generated_quiz(app, CURRICULUM)
 init_assignments(app, CURRICULUM)
+init_study_records(app)
 
 @app.route('/')
 def index():
@@ -139,11 +152,23 @@ def scores():
     courses = get_all_courses(student_id, password)
     stats = calculate_gpa(courses)
 
+    # 성적 등록 칸 아래 목록: 최근 학기부터, 같은 학기는 과목명 순
+    registered_courses = sorted(courses, key=lambda c: c['name'])
+    registered_courses.sort(key=lambda c: semester_sort_key(c['semester']), reverse=True)
+
+    # 그래프: 학기별 평점 + 그 학기에 들은 과목 이름 (점에 마우스를 올리면 표시)
+    chart_data = [
+        {'semester': sem, 'gpa': data['gpa'], 'courses': sorted(c['name'] for c in data['courses'])}
+        for sem, data in stats['semesters'].items()
+    ]
+
     return render_template('scores.html', 
                            student_id=student_id, 
                            name=name, 
                            year=year, 
                            stats=stats, 
+                           registered_courses=registered_courses,
+                           chart_data=chart_data,
                            grades=GRADE_POINTS.keys(),
                            curriculum=CURRICULUM,
                            course_credits=COURSE_CREDITS,

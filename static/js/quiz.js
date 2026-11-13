@@ -56,9 +56,13 @@ function clearMessage() {
     quizMessage.hidden = true;
 }
 
+// 저장된 오답 영역 (quiz.html #wrong-notes)
+const wrongNotes = document.getElementById('wrong-notes');
+
 // 화면 전환: 'setup' | 'play' | 'result'
 function showSection(sectionName) {
     quizSetup.hidden = sectionName !== 'setup';
+    wrongNotes.hidden = sectionName !== 'setup';   // 저장된 오답은 설정 화면에서만 표시
     quizPlay.hidden = sectionName !== 'play';
     quizResult.hidden = sectionName !== 'result';
 }
@@ -172,6 +176,7 @@ async function goNext() {
                 quizQuestions = data.questions;
                 clearMessage();
                 showResult();
+                if (data.wrong_answers_saved) loadWrongNotes();   // 오답 노트 새로고침
             } catch (error) { showMessage(error.message); }
             finally { quizBusy = false; quizNextBtn.disabled = false; }
         } else { showResult(); }
@@ -318,3 +323,104 @@ async function quizRequest(url, payload) {
 document.getElementById('quiz-new-btn').addEventListener('click', function () {
     clearMessage(); showSection('setup');
 });
+
+
+/* ------------------------------------------------------------------
+ * 저장된 오답 (학번 + 비밀번호 단위로 서버 DB 에 최대 10개 저장)
+ *  - 저장: 채점할 때 서버가 자동 저장 (/ai/api/quiz/grade)
+ *  - 조회: GET /api/wrong-answers   삭제: POST /api/wrong-answers/<id>/delete
+ * ------------------------------------------------------------------ */
+function noteLine(label, text, className) {
+    const p = document.createElement('p');
+    p.className = 'note-line' + (className ? ' ' + className : '');
+    const strong = document.createElement('strong');
+    strong.textContent = label + ' ';
+    p.append(strong, document.createTextNode(text));
+    return p;
+}
+
+function buildWrongNote(item) {
+    const details = document.createElement('details');
+    details.className = 'note-item';
+
+    const summary = document.createElement('summary');
+    const subject = document.createElement('span');
+    subject.className = 'chip chip-blue';
+    subject.textContent = quizText(item.subject);
+    const question = document.createElement('span');
+    question.className = 'note-question';
+    question.textContent = item.question;
+    summary.append(subject, question);
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'note-body';
+    const choices = document.createElement('ol');
+    choices.className = 'note-choices';
+    item.choices.forEach(function (choice, i) {
+        const li = document.createElement('li');
+        li.textContent = CHOICE_MARKS[i] + ' ' + choice;
+        if (i === item.answer) li.className = 'is-answer';
+        else if (i === item.selected_answer) li.className = 'is-mine';
+        choices.appendChild(li);
+    });
+    body.appendChild(choices);
+
+    const mine = item.selected_answer === null ? quizText('선택 안 함') : CHOICE_MARKS[item.selected_answer] + ' ' + item.choices[item.selected_answer];
+    body.appendChild(noteLine(quizText('내 답:'), mine, 'mine'));
+    body.appendChild(noteLine(quizText('정답:'), CHOICE_MARKS[item.answer] + ' ' + item.choices[item.answer], 'answer'));
+
+    const explain = document.createElement('div');
+    explain.className = 'quiz-review-explain';
+    explain.textContent = quizText('💡 해설: ') + item.explanation;
+    body.appendChild(explain);
+
+    const actions = document.createElement('div');
+    actions.className = 'btn-row note-actions';
+    const ask = document.createElement('button');
+    ask.type = 'button';
+    ask.className = 'btn-edit';
+    ask.textContent = quizText('AI에게 이 문제 질문하기');
+    ask.addEventListener('click', function () {
+        try {
+            StudyQuizBridge.openTutor(StudyQuizBridge.buildContext(item.subject, [item], [item.selected_answer], false));
+        } catch (error) { showMessage(error.message); }
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn-delete';
+    remove.textContent = quizText('삭제');
+    remove.addEventListener('click', async function () {
+        if (!window.confirm(quizText('이 오답을 삭제할까요?'))) return;
+        try {
+            const data = await quizRequest('/api/wrong-answers/' + item.id + '/delete', {});
+            renderWrongNotes(data.items, data.limit);
+        } catch (error) { showMessage(error.message); }
+    });
+    actions.append(ask, remove);
+    body.appendChild(actions);
+
+    details.appendChild(body);
+    return details;
+}
+
+function renderWrongNotes(items, limit) {
+    const list = document.getElementById('wrong-notes-list');
+    if (!list) return;
+    list.innerHTML = '';
+    items.forEach(function (item) { list.appendChild(buildWrongNote(item)); });
+    document.getElementById('wrong-notes-empty').hidden = items.length > 0;
+    document.getElementById('wrong-notes-count').textContent = items.length + ' / ' + (limit || 10);
+}
+
+async function loadWrongNotes() {
+    if (!wrongNotes || !wrongNotes.dataset || wrongNotes.dataset.loggedIn !== 'true') return;
+    try {
+        const response = await fetch('/api/wrong-answers', {headers: {'Accept': 'application/json'}});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || quizText('요청에 실패했습니다.'));
+        renderWrongNotes(data.items, data.limit);
+    } catch (error) { showMessage(error.message); }
+}
+
+loadWrongNotes();

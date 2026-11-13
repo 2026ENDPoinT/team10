@@ -20,7 +20,8 @@ const chartText = value => typeof uiText === 'function' ? uiText(value) : value;
 
 /* ------------------------------------------------------------------
  * 2. 성적 추이 그래프 (scores.html 에서만 동작)
- *    - window.SEMESTER_GPA : [{semester: '2026년 1학기', gpa: 3.8}, ...]  (scores.html 이 서버 값으로 채움)
+ *    - window.SEMESTER_GPA : [{semester: '2026년 1학기', gpa: 3.8, courses: ['자료구조', ...]}, ...]  (scores.html 이 서버 값으로 채움)
+ *    - 학기 평점 점에 마우스를 올리면(또는 Tab 포커스/터치) 그 학기에 들은 과목 이름을 말풍선으로 표시
  *    - window.OVERALL_GPA  : 전체 누적 평점평균 -> 가로 점선으로 표시
  *    과목을 등록/수정/삭제하면 서버가 다시 계산한 값으로 페이지가 새로 그려지므로 자동 반영됨
  * ------------------------------------------------------------------ */
@@ -99,7 +100,8 @@ function drawGpaChart() {
     // 전체 평균 가로선 (수치에 맞는 높이)
     const avgY = yOf(overall);
     svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: avgY, y2: avgY, class: 'gc-avg-line' }));
-    svg.appendChild(svgEl('text', { x: W - padR - 4, y: avgY - 8, class: 'gc-avg-text', 'text-anchor': 'end' }, chartText('평균 ') + overall.toFixed(2)));
+    // 평균 숫자는 선 아래쪽에 표시 (학기 평점 숫자는 점 위쪽에 있으므로 겹치지 않게)
+    svg.appendChild(svgEl('text', { x: W - padR - 4, y: avgY + 18, class: 'gc-avg-text', 'text-anchor': 'end' }, chartText('평균 ') + overall.toFixed(2)));
 
     // 학기별 평점 꺾은선
     if (data.length > 1) {
@@ -109,6 +111,40 @@ function drawGpaChart() {
         svg.appendChild(svgEl('path', { d: d, class: 'gc-line' }));
     }
 
+    // 말풍선: 학기 이름 + 평점 + 그 학기 과목 목록
+    const tip = document.createElement('div');
+    tip.className = 'gc-tooltip';
+    tip.id = 'gpa-chart-tooltip';
+    tip.setAttribute('role', 'tooltip');
+    tip.hidden = true;
+
+    function semesterLabel(parsed) {
+        if (!parsed.year) { return chartText(parsed.term); }
+        return parsed.year + (window.UI_LANGUAGE === 'en' ? ' ' : '년 ') + chartText(parsed.term);
+    }
+
+    function showTip(p, x, y) {
+        tip.innerHTML = '';
+        const head = document.createElement('strong');
+        head.textContent = semesterLabel(parseSemester(p.semester)) + ' · ' + p.gpa.toFixed(2) + ' / 4.5';
+        tip.appendChild(head);
+        const list = document.createElement('ul');
+        (p.courses || []).forEach(function (name) {
+            const li = document.createElement('li');
+            li.textContent = chartText(name);
+            list.appendChild(li);
+        });
+        tip.appendChild(list);
+        // SVG 는 가로 100%·비율 유지로 늘어나므로 viewBox 좌표를 % 로 바꿔 위치 지정
+        tip.style.left = (x / W * 100) + '%';
+        tip.style.top = (y / H * 100) + '%';
+        tip.classList.toggle('align-left', x / W < 0.2);
+        tip.classList.toggle('align-right', x / W > 0.8);
+        tip.hidden = false;
+    }
+
+    function hideTip() { tip.hidden = true; }
+
     // 점 + 평점 숫자 + 학기 이름
     const labelSize = data.length > 10 ? 10 : 12;
     data.forEach(function (p, i) {
@@ -116,16 +152,31 @@ function drawGpaChart() {
         const y = yOf(p.gpa);
         const parsed = parseSemester(p.semester);
 
-        const circle = svgEl('circle', { cx: x, cy: y, r: 7, class: 'gc-point' });
-        circle.appendChild(svgEl('title', {}, p.semester + ' : ' + p.gpa.toFixed(2) + ' / 4.5'));
-        svg.appendChild(circle);
+        svg.appendChild(svgEl('circle', { cx: x, cy: y, r: 7, class: 'gc-point' }));
+
+        // 마우스를 올리기 쉽도록 보이지 않는 큰 원을 위에 겹침 (키보드 Tab 으로도 접근 가능)
+        const hit = svgEl('circle', {
+            cx: x, cy: y, r: 20, class: 'gc-hit', tabindex: 0,
+            'aria-describedby': 'gpa-chart-tooltip',
+            'aria-label': semesterLabel(parsed) + ' ' + p.gpa.toFixed(2) + ' / 4.5'
+        });
+        hit.addEventListener('mouseenter', function () { showTip(p, x, y); });
+        hit.addEventListener('focus', function () { showTip(p, x, y); });
+        hit.addEventListener('click', function () { showTip(p, x, y); });   // 터치 화면
+        hit.addEventListener('mouseleave', hideTip);
+        hit.addEventListener('blur', hideTip);
+        svg.appendChild(hit);
 
         svg.appendChild(svgEl('text', { x: x, y: y - 14, class: 'gc-value', 'text-anchor': 'middle' }, p.gpa.toFixed(2)));
         svg.appendChild(svgEl('text', { x: x, y: H - padB + 22, class: 'gc-axis-text', 'text-anchor': 'middle', 'font-size': labelSize }, parsed.year ? parsed.year + (window.UI_LANGUAGE === 'en' ? '' : '년') : ''));
         svg.appendChild(svgEl('text', { x: x, y: H - padB + 22 + labelSize + 4, class: 'gc-axis-text', 'text-anchor': 'middle', 'font-size': labelSize }, chartText(parsed.term)));
     });
 
+    // 큰 원(hit)이 숫자·선을 가리지 않도록 맨 마지막에 다시 붙여 가장 위에 오게 함
+    svg.querySelectorAll('.gc-hit').forEach(function (el) { svg.appendChild(el); });
+
     chartBox.appendChild(svg);
+    chartBox.appendChild(tip);
 }
 
 drawGpaChart();

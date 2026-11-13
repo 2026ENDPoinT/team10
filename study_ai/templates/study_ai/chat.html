@@ -42,8 +42,19 @@
           <button type="button" id="clear-context" class="link-button" hidden>{{ t('해제') }}</button>
         </div>
       </section>
+      <!-- 저장된 대화 (학번 + 비밀번호 단위로 최근 3개 자동 저장) -->
+      <section class="context-card saved-chats" id="saved-chats" aria-labelledby="saved-chats-heading"
+               data-logged-in="{{ 'true' if session.get('student_id') else 'false' }}">
+        <h2 id="saved-chats-heading">{{ t('💬 저장된 대화') }} <span id="saved-chats-count">0 / 3</span></h2>
+        {% if session.get('student_id') %}
+          <p class="saved-chats-note">{{ t('답변을 받을 때마다 대화가 자동 저장됩니다. 최근 3개까지 보관되며 오래된 대화부터 지워집니다.') }}</p>
+          <p class="saved-chats-empty" id="saved-chats-empty">{{ t('아직 저장된 대화가 없습니다.') }}</p>
+          <ul class="saved-chats-list" id="saved-chats-list"></ul>
+        {% else %}
+          <p class="saved-chats-note">{{ t('로그인하면 최근 대화 3개가 자동 저장됩니다.') }}</p>
+        {% endif %}
+      </section>
       <p class="small">{{ t('퀴즈 결과를 바탕으로 학습을 돕습니다. 성적은 변경하지 않습니다.') }}</p>
-      {% if back_url %}<p class="small"><a class="back-link" href="{{ back_url }}">{{ t('← 성적 관리로 돌아가기') }}</a></p>{% endif %}
     </aside>
 
     <section class="chat-panel" aria-label="Study conversation">

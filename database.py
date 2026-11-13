@@ -1,5 +1,10 @@
+import json
 import sqlite3
+import time
 from pathlib import Path
+
+WRONG_ANSWER_LIMIT = 10   # 계정당 저장되는 틀린 문제 수
+CONVERSATION_LIMIT = 3    # 계정당 저장되는 AI 대화 수
 
 
 def update_student_password(student_id, old_password, new_password):
@@ -31,12 +36,13 @@ def update_student_password(student_id, old_password, new_password):
             conn.rollback()
             return 'not_found'
 
-        # 해당 학생이 등록한 과목들의 비밀번호 연결 정보도 함께 수정
-        cursor.execute('''
-            UPDATE courses
-            SET password = ?
-            WHERE student_id = ? AND password = ?
-        ''', (new_password, student_id, old_password))
+        # 해당 학생이 등록한 과목·오답 노트·AI 대화의 비밀번호 연결 정보도 함께 수정
+        for table in ('courses', 'wrong_answers', 'chat_conversations'):
+            cursor.execute(f'''
+                UPDATE {table}
+                SET password = ?
+                WHERE student_id = ? AND password = ?
+            ''', (new_password, student_id, old_password))
 
         conn.commit()
         return 'ok'
@@ -75,6 +81,32 @@ def init_db():
             credit INTEGER NOT NULL,
             grade TEXT NOT NULL,
             point REAL NOT NULL
+        )
+    ''')
+    # 퀴즈 오답 노트 (학번 + 비밀번호가 일치해야 조회 가능, 계정당 최대 WRONG_ANSWER_LIMIT 개)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS wrong_answers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            password TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            question TEXT NOT NULL,
+            choices TEXT NOT NULL,
+            answer INTEGER NOT NULL,
+            selected_answer INTEGER,
+            explanation TEXT NOT NULL,
+            saved_at REAL NOT NULL
+        )
+    ''')
+    # AI 대화 기록 (학번 + 비밀번호가 일치해야 조회 가능, 계정당 최대 CONVERSATION_LIMIT 개)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            password TEXT NOT NULL,
+            title TEXT NOT NULL,
+            messages TEXT NOT NULL,
+            updated_at REAL NOT NULL
         )
     ''')
     # CREATE TABLE IF NOT EXISTS does not upgrade an existing table.
@@ -154,3 +186,126 @@ def delete_course(course_id):
     cursor.execute('DELETE FROM courses WHERE id = ?', (course_id,))
     conn.commit()
     conn.close()
+
+
+# ---------------------------------------------------------------------
+# 퀴즈 오답 노트 (학번 + 비밀번호 단위)
+# ---------------------------------------------------------------------
+def _wrong_answer_view(row):
+    return {
+        'id': row['id'], 'subject': row['subject'], 'question': row['question'],
+        'choices': json.loads(row['choices']), 'answer': row['answer'],
+        'selected_answer': row['selected_answer'], 'explanation': row['explanation'],
+        'saved_at': row['saved_at'],
+    }
+
+
+def save_wrong_answers(student_id, password, subject, questions):
+    """틀린 문제 저장. 같은 문제는 새로 덮어쓰고, 최근 WRONG_ANSWER_LIMIT 개만 남긴다."""
+    if not questions:
+        return
+    conn = get_db_connection()
+    try:
+        with conn:
+            now = time.time()
+            for offset, q in enumerate(questions):
+                conn.execute(
+                    'DELETE FROM wrong_answers WHERE student_id = ? AND password = ? AND question = ?',
+                    (student_id, password, q['question']))
+                conn.execute('''
+                    INSERT INTO wrong_answers
+                        (student_id, password, subject, question, choices, answer, selected_answer, explanation, saved_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (student_id, password, subject, q['question'], json.dumps(q['choices'], ensure_ascii=False),
+                      q['answer'], q.get('selected_answer'), q['explanation'], now + offset * 1e-6))
+            conn.execute('''
+                DELETE FROM wrong_answers
+                WHERE student_id = ? AND password = ? AND id NOT IN (
+                    SELECT id FROM wrong_answers WHERE student_id = ? AND password = ?
+                    ORDER BY saved_at DESC, id DESC LIMIT ?)
+            ''', (student_id, password, student_id, password, WRONG_ANSWER_LIMIT))
+    finally:
+        conn.close()
+
+
+def get_wrong_answers(student_id, password):
+    conn = get_db_connection()
+    try:
+        rows = conn.execute('''
+            SELECT * FROM wrong_answers WHERE student_id = ? AND password = ?
+            ORDER BY saved_at DESC, id DESC LIMIT ?
+        ''', (student_id, password, WRONG_ANSWER_LIMIT)).fetchall()
+    finally:
+        conn.close()
+    return [_wrong_answer_view(row) for row in rows]
+
+
+def delete_wrong_answer(item_id, student_id, password):
+    conn = get_db_connection()
+    try:
+        with conn:
+            cursor = conn.execute('DELETE FROM wrong_answers WHERE id = ? AND student_id = ? AND password = ?',
+                                  (item_id, student_id, password))
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------
+# AI 대화 기록 (학번 + 비밀번호 단위)
+# ---------------------------------------------------------------------
+def _conversation_view(row):
+    return {'id': row['id'], 'title': row['title'], 'messages': json.loads(row['messages']),
+            'updated_at': row['updated_at']}
+
+
+def save_conversation(student_id, password, conversation_id, title, messages):
+    """대화 저장(내 대화면 갱신, 아니면 새로 저장). 최근 CONVERSATION_LIMIT 개만 남기고 대화 id 를 돌려준다."""
+    conn = get_db_connection()
+    try:
+        with conn:
+            now = time.time()
+            payload = json.dumps(messages, ensure_ascii=False)
+            updated = 0
+            if conversation_id is not None:
+                updated = conn.execute('''
+                    UPDATE chat_conversations SET title = ?, messages = ?, updated_at = ?
+                    WHERE id = ? AND student_id = ? AND password = ?
+                ''', (title, payload, now, conversation_id, student_id, password)).rowcount
+            if not updated:
+                conversation_id = conn.execute('''
+                    INSERT INTO chat_conversations (student_id, password, title, messages, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (student_id, password, title, payload, now)).lastrowid
+            conn.execute('''
+                DELETE FROM chat_conversations
+                WHERE student_id = ? AND password = ? AND id NOT IN (
+                    SELECT id FROM chat_conversations WHERE student_id = ? AND password = ?
+                    ORDER BY updated_at DESC, id DESC LIMIT ?)
+            ''', (student_id, password, student_id, password, CONVERSATION_LIMIT))
+        return conversation_id
+    finally:
+        conn.close()
+
+
+def get_conversations(student_id, password):
+    conn = get_db_connection()
+    try:
+        rows = conn.execute('''
+            SELECT * FROM chat_conversations WHERE student_id = ? AND password = ?
+            ORDER BY updated_at DESC, id DESC LIMIT ?
+        ''', (student_id, password, CONVERSATION_LIMIT)).fetchall()
+    finally:
+        conn.close()
+    return [_conversation_view(row) for row in rows]
+
+
+def delete_conversation(conversation_id, student_id, password):
+    conn = get_db_connection()
+    try:
+        with conn:
+            cursor = conn.execute('DELETE FROM chat_conversations WHERE id = ? AND student_id = ? AND password = ?',
+                                  (conversation_id, student_id, password))
+        return cursor.rowcount > 0
+    finally:
+        conn.close()

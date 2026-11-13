@@ -80,6 +80,21 @@
             <p class="quiz-status" id="quiz-generation-status" role="status" aria-live="polite"></p>
         </section>
 
+        <!-- 저장된 오답 (퀴즈 설정 칸 아래, 설정 화면에서만 표시) -->
+        <section class="list-card" id="wrong-notes" data-logged-in="{{ 'true' if session.get('student_id') else 'false' }}">
+            <div class="card-head">
+                <h2>{{ t('📌 저장된 오답') }}</h2>
+                <span class="chip chip-blue" id="wrong-notes-count">0 / 10</span>
+            </div>
+            {% if session.get('student_id') %}
+                <p class="card-desc">{{ t('퀴즈에서 틀린 문제가 자동으로 저장됩니다. 최근 10개까지 보관되며 오래된 문제부터 지워집니다.') }}</p>
+                <p class="empty-msg" id="wrong-notes-empty">{{ t('아직 저장된 오답이 없습니다.') }}</p>
+                <div class="note-list" id="wrong-notes-list"></div>
+            {% else %}
+                <p class="empty-msg">{{ t('로그인하면 틀린 문제가 자동으로 저장됩니다.') }}</p>
+            {% endif %}
+        </section>
+
         <!-- 화면 2: 문제 풀이 -->
         <section class="list-card" id="quiz-play" hidden>
             <div class="card-head">

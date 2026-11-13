@@ -44,8 +44,7 @@ class IntegratedAppTests(unittest.TestCase):
         self.client.get('/quiz', query_string=self.student)
         tutor = self.client.get('/ai/')
         self.assertEqual(tutor.status_code, 200)
-        self.assertIn(b'/scores?', tutor.data)
-        self.assertIn(b'student_id=12345678', tutor.data)
+        self.assertNotIn('성적 관리로 돌아가기'.encode(), tutor.data)  # 돌아가기 버튼은 삭제됨 (아일랜드로 이동)
         self.assertIn(b'OPENAI_API_KEY', tutor.data)
 
     def test_no_key_never_returns_fake_answer(self):

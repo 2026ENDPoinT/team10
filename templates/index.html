@@ -35,8 +35,6 @@
                 <div class="btn-row">
                     {% if session.get('student_id') %}
                         <a href="{{ url_for('scores') }}" class="btn-primary">{{ t('📊 내 성적으로') }}</a>
-                    {% else %}
-                        <a href="#login" class="btn-primary">{{ t('지금 시작하기') }}</a>
                     {% endif %}
                     <a href="#details" class="btn-secondary">{{ t('자세히 알아보기 ↓') }}</a>
                 </div>

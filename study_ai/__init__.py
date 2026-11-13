@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, current_app, jsonify, render_template, request, session, url_for
+from flask import Blueprint, current_app, jsonify, render_template, request
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
 from .service import TutorError, answer_question
@@ -34,18 +34,11 @@ def index():
             from flask import abort
             abort(400)
         assignment_plan = planning_context(assignment_id)
-    back_url = None
-    endpoint = current_app.config.get('STUDY_BACK_ENDPOINT')
-    navigation = session.get('study_navigation')
-    if endpoint and navigation:
-        back_url = url_for(endpoint, **navigation)
-    elif 'index' in current_app.view_functions:
-        back_url = url_for('index')
     mode = current_app.config['AI_MODE']
     key_name = {'groq': 'GROQ_API_KEY', 'gemini': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
     return render_template('study_ai/chat.html', mode=mode, key_name=key_name, assignment_plan=assignment_plan,
                            provider_name={'groq': 'Groq', 'gemini': 'Google Gemini', 'openai': 'OpenAI'}.get(mode, mode),
-                           configured=bool(current_app.config.get(key_name)), back_url=back_url)
+                           configured=bool(current_app.config.get(key_name)))
 
 
 @bp.get('/api/health')

@@ -10,6 +10,7 @@ from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 from .groq import request_groq
 from .service import TutorError
 from .validation import validate_payload
+from database import save_wrong_answers
 
 SCHEMA = {'type': 'object', 'properties': {'questions': {'type': 'array', 'items': {
     'type': 'object', 'properties': {'question': {'type': 'string'},
@@ -138,6 +139,13 @@ def grade():
             raise ValueError('선택한 답의 개수 또는 형식이 올바르지 않습니다.')
         for q, answer in zip(questions, answers):
             q.update(selected_answer=answer, is_correct=answer == q['answer'])
-        return jsonify(subject=row['subject'], questions=questions, correct=sum(q['is_correct'] for q in questions))
+        # 로그인한 경우 틀린 문제(선택 안 함 포함)를 오답 노트에 저장 (학번 + 비밀번호 단위, 최대 10개)
+        saved = False
+        if session.get('student_id') and session.get('password'):
+            wrong = [q for q in questions if not q['is_correct']]
+            save_wrong_answers(session['student_id'], session['password'], row['subject'], wrong)
+            saved = bool(wrong)
+        return jsonify(subject=row['subject'], questions=questions, correct=sum(q['is_correct'] for q in questions),
+                       wrong_answers_saved=saved)
     except (TutorError, ValueError, BadRequest, RequestEntityTooLarge) as exc:
         return error_response(exc)
