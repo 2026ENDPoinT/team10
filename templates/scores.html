@@ -1,19 +1,30 @@
-/*성적 입력 및 조회*/
+{#
+  성적 입력 및 조회 페이지
+  - 상단: 다이나믹 아일랜드 (_island.html)
+  - 중단: 성적 요약 / 과목·성적 등록(부드러운 카드 디자인) / 과목 조회
+  - 하단: 학기별 성적 추이 그래프 (static/js/main.js 의 drawGpaChart)
+  - 디자인 참고 이미지: 스크린샷_2026-11-13_180001.png (상단 메뉴바, 큰 제목)
+                        스크린샷_2026-11-13_180024.png (둥근 카드, 알약형 칩)
+                        스크린샷_2026-11-13_180041.png (노랑/파랑 카드)
+  - 추가로 사용한 이미지 없음
+#}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>대학생 성적 관리 프로그램 - 성적 관리</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="modern">
+    {% set active_page = 'scores' %}
+    {% include 'island.html' %}
+
     <div class="container">
-        <div class="header-info">
-            <h1>🎓 성적 관리 프로그램</h1>
-            <p><strong>{{ year }}학년</strong> | 학번: <strong>{{ student_id }}</strong> | 이름: <strong>{{ name }}</strong>님 환영합니다!</p>
-                    <a href="{{ url_for('quiz', student_id=student_id, name=name, year=year) }}" class="btn-edit">🧠 학습 퀴즈로 이동</a>
-            <a href="{{ url_for('index') }}" class="btn-back-main">처음 화면으로</a>
-        </div>
+        <header class="page-title">
+            <span class="page-sub">{{ year }}학년 · {{ name }}님 환영합니다!</span>
+            <h1>성적 관리</h1>
+        </header>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -25,7 +36,7 @@
             {% endif %}
         {% endwith %}
 
-        <div class="summary-card">
+        <div class="summary-card summary-blue">
             <h2>📊 전체 성적 요약</h2>
             <p><strong>전체 누적 평점평균:</strong> {{ stats.overall_gpa }} / 4.5</p>
             <p><strong>전체 등록 학점 수:</strong> {{ stats.total_credits }} 학점</p>
@@ -67,7 +78,7 @@
                             <option value="{{ term }}">{{ term }}</option>
                         {% endfor %}
                     </select>
-                    
+
                     <!-- 자동 입력 및 수정 불가 학점 필드 -->
                     <input type="number" name="credit" id="credit_input" placeholder="학점 (자동)" readonly required style="background-color: #e9ecef; cursor: not-allowed; width: 80px;">
 
@@ -78,7 +89,7 @@
                             <option value="{{ g }}">{{ g }}</option>
                         {% endfor %}
                     </select>
-                    
+
                     <button type="submit" class="btn-primary">등록하기</button>
                 </div>
             </form>
@@ -126,7 +137,28 @@
                 <p class="empty-msg">등록된 과목이 없습니다. 위 폼에서 과목을 추가해주세요.</p>
             {% endif %}
         </div>
+
+        <!-- 성적 추이 그래프: 학기별 평점(점·선) + 전체 평균(가로 점선) -->
+        <div class="list-card chart-card">
+            <h2>📈 성적 추이 그래프</h2>
+            <div id="gpa-chart" class="chart-wrap"></div>
+            <p class="empty-msg" id="gpa-chart-empty" hidden>등록된 과목이 없어 그래프를 표시할 수 없습니다.</p>
+            <div class="chart-legend">
+                <span><i class="legend-dot"></i> 학기 평점</span>
+                <span><i class="legend-dash"></i> 전체 평균</span>
+            </div>
+        </div>
     </div>
+
+    {# 그래프용 데이터: 서버에서 계산된 학기별 평점(stats.semesters)과 전체 평균(stats.overall_gpa)을 JS로 전달 #}
+    {% set chart_data = [] %}
+    {% for semester, data in stats.semesters.items() %}
+        {% set _ = chart_data.append({'semester': semester, 'gpa': data.gpa}) %}
+    {% endfor %}
+<script>
+    window.SEMESTER_GPA = JSON.parse('{{ chart_data|tojson }}');
+    window.OVERALL_GPA = Number('{{ stats.overall_gpa }}');
+</script>
 
     <script>
         document.getElementById('course_select').addEventListener('change', function() {
@@ -135,5 +167,6 @@
             document.getElementById('credit_input').value = credit ? credit : '';
         });
     </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
