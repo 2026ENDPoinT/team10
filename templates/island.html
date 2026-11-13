@@ -4,7 +4,10 @@
 
         <a class="island-btn {% if active_page == 'quiz' %}active{% endif %}"
            href="{{ url_for('quiz', student_id=student_id, name=name, year=year) }}">🧠 QUIZ</a>
-           
+
+        <a class="island-btn {% if active_page == 'ai' %}active{% endif %}"
+           href="{{ url_for('study_ai.index') }}">🤖 AI</a>
+
         <a class="island-btn {% if active_page == 'scores' %}active{% endif %}"
            href="{{ url_for('scores') }}">📊 성적</a>
 
