@@ -63,6 +63,17 @@ CURRICULUM = {
 
 ALLOWED_SEMESTERS = ["여름학기", "1학기", "2학기", "겨울학기"]
 
+# 비밀번호 규칙: 5~20자 + 특수문자(!@#$%^&*) 1개 이상 (templates/_password_rules.html 과 동일하게 유지)
+PASSWORD_MIN_LENGTH = 5
+PASSWORD_MAX_LENGTH = 20
+PASSWORD_SPECIAL_CHARS = re.compile(r'[!@#$%^&*]')
+PASSWORD_RULE_MESSAGE = '비밀번호는 5~20자이며 특수문자(!@#$%^&*)를 1개 이상 포함해야 합니다.'
+
+
+def is_valid_password(password):
+    return (PASSWORD_MIN_LENGTH <= len(password) <= PASSWORD_MAX_LENGTH
+            and PASSWORD_SPECIAL_CHARS.search(password) is not None)
+
 init_generated_quiz(app, CURRICULUM)
 init_assignments(app, CURRICULUM)
 
@@ -89,8 +100,9 @@ def login():
         flash('학년을 선택해주세요.', 'error')
         return redirect(url_for('index'))
 
-    if not re.search(r'[!@#$%^&*]', password):
-        flash('비밀번호는 특수문자(!@#$%^&*)를 포함해야 합니다.', 'error')
+    # 새로 만드는 계정만 규칙 검사 (규칙 도입 전에 만든 기존 계정은 그대로 로그인 가능)
+    if get_student(student_id, password) is None and not is_valid_password(password):
+        flash(PASSWORD_RULE_MESSAGE, 'error')
         return redirect(url_for('index'))
 
     save_or_update_student(student_id, name, year, password)
@@ -308,11 +320,22 @@ def change_password():
     old_password = session['password']
     new_password = request.form.get('new_password', '').strip()
 
-    if not re.search(r'[!@#$%^&*]', new_password):
-        flash('새 비밀번호는 특수문자(!@#$%^&*) 중 하나 이상을 포함해야 합니다.', 'error')
+    if not is_valid_password(new_password):
+        flash(PASSWORD_RULE_MESSAGE, 'error')
         return redirect(request.referrer or url_for('scores'))
 
-    update_student_password(student_id, old_password, new_password)
+    result = update_student_password(student_id, old_password, new_password)
+    if result == 'same':
+        flash('현재 비밀번호와 다른 비밀번호를 입력해주세요.', 'error')
+        return redirect(request.referrer or url_for('scores'))
+    if result == 'taken':
+        flash('같은 학번에서 이미 사용 중인 비밀번호입니다. 다른 비밀번호를 입력해주세요.', 'error')
+        return redirect(request.referrer or url_for('scores'))
+    if result == 'not_found':
+        session.clear()
+        flash('계정 정보를 찾을 수 없습니다. 다시 로그인해주세요.', 'error')
+        return redirect(url_for('index'))
+
     session['password'] = new_password
     flash('비밀번호가 성공적으로 변경되었습니다.', 'success')
     

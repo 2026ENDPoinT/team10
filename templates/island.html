@@ -63,7 +63,11 @@
         <form action="{{ url_for('change_password') }}" method="POST">
             <div class="field">
                 <label for="new_password">{{ t('새 비밀번호') }}</label>
-                <input type="password" id="new_password" name="new_password" placeholder="{{ t('특수문자(!@#$%^&*) 포함') }}" required>
+                <input type="password" id="new_password" name="new_password" placeholder="{{ t('5~20자, 특수문자(!@#$%^&*) 포함') }}"
+                       minlength="5" maxlength="20" pattern=".*[!@#$%^&*].*"
+                       title="{{ t('비밀번호는 5~20자이며 특수문자(!@#$%^&*)를 1개 이상 포함해야 합니다.') }}"
+                       aria-describedby="new_password-rules" required>
+                {% with pw_input = 'new_password' %}{% include '_password_rules.html' %}{% endwith %}
             </div>
             <div class="modal-actions">
                 <button type="button" id="closePasswordModal" class="btn-secondary">{{ t('취소') }}</button>

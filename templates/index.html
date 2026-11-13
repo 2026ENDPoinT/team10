@@ -86,9 +86,13 @@
                         <label for="password">{{ t('비밀번호') }}</label>
                         <div class="password-wrap">
                             <input type="password" id="password" name="password"
-                                   placeholder="{{ t('특수문자(!@#$%^&*) 포함 필수') }}" required>
+                                   placeholder="{{ t('5~20자, 특수문자(!@#$%^&*) 포함') }}"
+                                   minlength="5" maxlength="20" pattern=".*[!@#$%^&*].*"
+                                   title="{{ t('비밀번호는 5~20자이며 특수문자(!@#$%^&*)를 1개 이상 포함해야 합니다.') }}"
+                                   aria-describedby="password-rules" required>
                             <button type="button" id="togglePassword" title="{{ t('비밀번호 표시/숨기기') }}">(-)</button>
                         </div>
+                        {% with pw_input = 'password' %}{% include '_password_rules.html' %}{% endwith %}
                     </div>
 
                     <button type="submit" class="btn-primary">{{ t('로그인 및 성적 관리 시작') }}</button>
