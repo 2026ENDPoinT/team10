@@ -1,6 +1,8 @@
 import math
 import re
+from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from scipy.stats import norm
 from database import (
@@ -108,14 +110,14 @@ def logout():
 
 @app.route('/scores', methods=['GET'])
 def scores():
-    student_id = request.args.get('student_id', '').strip()
-    name = request.args.get('name', '').strip()
-    year = request.args.get('year', '').strip()
-    password = request.args.get('password', '').strip()
-
-    if not re.match(r'^[1-9][0-9]{7}$', student_id):
-        flash('학번은 0으로 시작하지 않는 8자리 숫자여야 합니다.', 'error')
+    if 'student_id' not in session or 'password' not in session:
+        flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
+
+    student_id = session['student_id']
+    password = session['password']
+    name = session.get('name', '')
+    year = session.get('year', '')
 
     courses = get_all_courses(student_id, password)
     stats = calculate_gpa(courses)
@@ -291,9 +293,14 @@ def change_password():
 
 @app.route('/add', methods=['POST'])
 def add():
-    student_id = request.form.get('student_id', '')
-    name_val = request.form.get('name', '')
-    year = request.form.get('year', '')
+    if 'student_id' not in session or 'password' not in session:
+        flash('로그인이 필요합니다.', 'error')
+        return redirect(url_for('index'))
+
+    student_id = session['student_id']
+    password = session['password']
+    name_val = session.get('name', '')
+    year = session.get('year', '')
 
     course_name = request.form.get('name_input', '').strip()
     sel_year = request.form.get('semester_year', '').strip()
@@ -310,7 +317,7 @@ def add():
 
     semester = f"{sel_year}년 {sel_sem}"
 
-    existing_courses = get_all_courses(student_id)
+    existing_courses = get_all_courses(student_id, password)
     for c in existing_courses:
         if c['name'] == course_name:
             flash(f"이미 등록된 과목입니다: '{course_name}' ({c['semester']})", 'error')
@@ -323,20 +330,21 @@ def add():
     credit = COURSE_CREDITS[course_name]
     point = GRADE_POINTS[grade]
     
-    add_course(student_id, course_name, semester, credit, grade, point)
+    add_course(student_id, password, course_name, semester, credit, grade, point)
     flash('과목이 성공적으로 등록되었습니다.', 'success')
     return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
 @app.route('/edit/<int:course_id>', methods=['GET', 'POST'])
 def edit(course_id):
-    course = get_course_by_id(course_id)
-    if not course:
-        flash('존재하지 않는 과목입니다.', 'error')
+    if 'student_id' not in session:
         return redirect(url_for('index'))
 
+    student_id = session['student_id']
+    name = session.get('name', '')
+    year = session.get('year', '')
 
     course = get_course_by_id(course_id)
-    if not course or course['student_id'] != session['student_id'] or course['password'] != session['password']:
+    if not course or course['student_id'] != student_id or course['password'] != session['password']:
         flash('존재하지 않거나 권한이 없는 과목입니다.', 'error')
         return redirect(url_for('manage'))
 
@@ -364,7 +372,7 @@ def edit(course_id):
 
         semester = f"{sel_year}년 {sel_sem}"
 
-        existing_courses = get_all_courses(student_id)
+        existing_courses = get_all_courses(student_id, session['password'])
         for c in existing_courses:
             if c['id'] != course_id and c['name'] == c_name:
                 flash(f"이미 등록된 과목입니다: '{c_name}' ({c['semester']})", 'error')
@@ -386,10 +394,8 @@ def edit(course_id):
 
 @app.route('/delete/<int:course_id>', methods=['POST'])
 def delete(course_id):
-    student_id = request.form.get('student_id', '')
-    name = request.form.get('name', '')
-    year = request.form.get('year', '')
-
+    if 'student_id' not in session:
+        return redirect(url_for('index'))
 
     course = get_course_by_id(course_id)
     if course and course['student_id'] == session['student_id'] and course['password'] == session['password']:
