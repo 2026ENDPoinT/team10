@@ -3,6 +3,7 @@ import re
 import os
 import secrets
 from pathlib import Path
+from werkzeug.middleware.proxy_fix import ProxyFix   # import 부분에 추가
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
@@ -20,6 +21,7 @@ from study_records import init_study_records
 
 load_dotenv(Path(__file__).with_name('.env'), override=True)
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)   # 이 줄 추가
 app.config['MAX_CONTENT_LENGTH'] = 128 * 1024
 init_localization(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
