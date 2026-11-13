@@ -2,10 +2,10 @@
 import hmac
 import json
 import secrets
-import sqlite3
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
+
+from database import get_db_connection
 
 bp = Blueprint('assignments', __name__, url_prefix='/assignments')
 KST = timezone(timedelta(hours=9))
@@ -16,20 +16,8 @@ def now_kst():
 
 
 def connection():
-    conn = sqlite3.connect(current_app.config['ASSIGNMENTS_DB'])
-    conn.row_factory = sqlite3.Row
-    conn.execute('''CREATE TABLE IF NOT EXISTS assignments (
-        id INTEGER PRIMARY KEY, owner INTEGER NOT NULL, subject TEXT NOT NULL,
-        title TEXT NOT NULL, deadline TEXT NOT NULL,
-        priority INTEGER NOT NULL CHECK(priority BETWEEN 1 AND 3),
-        completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)))''')
-    columns = {row['name'] for row in conn.execute('PRAGMA table_info(assignments)')}
-    if 'estimated_minutes' not in columns:
-        conn.execute('ALTER TABLE assignments ADD COLUMN estimated_minutes INTEGER NOT NULL DEFAULT 0')
-    if 'checklist' not in columns:
-        conn.execute("ALTER TABLE assignments ADD COLUMN checklist TEXT NOT NULL DEFAULT '[]'")
-    conn.commit()
-    return conn
+    # assignments 테이블은 database.init_db() 에서 만든다
+    return get_db_connection()
 
 
 def token():
@@ -69,9 +57,6 @@ def notice():
 
 
 def init_assignments(app, curriculum):
-    folder = Path(app.root_path) / 'data'
-    folder.mkdir(exist_ok=True)
-    app.config.setdefault('ASSIGNMENTS_DB', str(folder / 'assignments.db'))
     app.config['ASSIGNMENT_SUBJECTS'] = list(dict.fromkeys(c for courses in curriculum.values() for c in courses))
     app.register_blueprint(bp)
     app.jinja_env.globals.update(assignment_csrf=token, assignment_notice=notice, deadline_label=label)
@@ -200,8 +185,8 @@ def check_step(item_id, step_index):
     conn = connection()
     try:
         with conn:
-            conn.execute('BEGIN IMMEDIATE')
-            row = conn.execute('SELECT checklist FROM assignments WHERE id=? AND owner=?',
+            conn.begin_write()
+            row = conn.execute('SELECT checklist FROM assignments WHERE id=? AND owner=?' + conn.for_update,
                 (item_id,session['assignment_owner'])).fetchone()
             if not row:
                 abort(404)

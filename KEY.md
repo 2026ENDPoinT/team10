@@ -34,15 +34,19 @@ courses, existing_courses: 과목 데이터 리스트
 2. 데이터베이스 (database.py 및 테이블 스키마)
 상수 및 연결
 
-DB_NAME: 데이터베이스 파일명 ("database.db")
+DATABASE_URL: 환경변수. 있으면 PostgreSQL, 없으면 SQLite 사용
 
-conn: SQLite 커넥션 객체
+DB_NAME: 로컬 SQLite 파일 경로 ("data/database.db")
+
+conn: get_db_connection()이 돌려주는 연결 객체 (SQL은 '?' 자리표시자로 작성, PostgreSQL에서는 자동으로 '%s'로 변환)
+
+students 테이블: id(기본키), student_id(학번, UNIQUE), password_hash, name, year
 
 courses 테이블 컬럼명 (데이터 추가/수정/조회 시 정확히 일치해야 함)
 
-id: 기본키, 자동 증가 정수 (INTEGER PRIMARY KEY AUTOINCREMENT)
+id: 기본키, 자동 증가 정수
 
-student_id: 학번 (TEXT NOT NULL)
+user_id: 계정 번호 (students.id 참조)
 
 name: 과목명 (TEXT NOT NULL)
 
@@ -52,7 +56,7 @@ credit: 학점 (INTEGER NOT NULL)
 
 grade: 등급 (TEXT NOT NULL, 예: "A0")
 
-point: 평점 (REAL NOT NULL, 예: 4.0)
+point: 평점 (DOUBLE PRECISION NOT NULL, 예: 4.0)
 
 3. 성적 계산 모듈 (gpa_calculator.py)
 상수 및 변수

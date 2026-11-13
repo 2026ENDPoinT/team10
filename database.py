@@ -1,195 +1,327 @@
+"""모든 데이터 저장을 담당하는 모듈.
+
+- 환경변수 DATABASE_URL 이 있으면 PostgreSQL(배포 환경, Render)에 연결한다.
+- 없으면 data/database.db SQLite 파일을 사용한다(로컬 개발·테스트용).
+
+SQL 은 두 DB 에서 같이 동작하도록 '?' 자리표시자로 작성하고, PostgreSQL 에서는 '%s' 로 바꿔 실행한다.
+비밀번호는 해시로만 저장하며, 다른 테이블은 학생을 students.id(user_id)로 참조한다.
+"""
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
 WRONG_ANSWER_LIMIT = 10   # 계정당 저장되는 틀린 문제 수
 CONVERSATION_LIMIT = 3    # 계정당 저장되는 AI 대화 수
+QUIZ_LIFETIME_SECONDS = 86400
+
+# 로컬 SQLite 파일 위치 (테스트에서 임시 파일로 바꿔 쓸 수 있다)
+DB_NAME = str(Path(__file__).resolve().parent / 'data' / 'database.db')
 
 
-def update_student_password(student_id, old_password, new_password):
-    """비밀번호 변경. 결과: 'ok' | 'same' | 'taken' | 'not_found'
+def database_url():
+    return os.getenv('DATABASE_URL', '').strip()
 
-    students 테이블의 기본키가 (student_id, password) 이므로, 같은 학번에서 이미 다른 성적 셋이
-    사용 중인 비밀번호로 바꾸면 UNIQUE 제약 오류가 난다. 미리 확인하고 오류 대신 결과 코드로 알려준다.
+
+def using_postgres():
+    return bool(database_url())
+
+
+def _dict_row(cursor, row):
+    return {column[0]: value for column, value in zip(cursor.description, row)}
+
+
+class Connection:
+    """sqlite3 / psycopg 연결을 같은 방식으로 쓰기 위한 얇은 래퍼.
+
+    with conn: 블록은 트랜잭션(성공 시 commit, 오류 시 rollback)이며 연결을 닫지 않는다.
     """
-    if new_password == old_password:
-        return 'same'
 
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        taken = cursor.execute(
-            'SELECT 1 FROM students WHERE student_id = ? AND password = ?',
-            (student_id, new_password)
-        ).fetchone()
-        if taken:
-            return 'taken'
+    def __init__(self, raw, postgres):
+        self.raw = raw
+        self.postgres = postgres
 
-        # 학생 정보 테이블 비밀번호 수정
-        cursor.execute('''
-            UPDATE students
-            SET password = ?
-            WHERE student_id = ? AND password = ?
-        ''', (new_password, student_id, old_password))
-        if cursor.rowcount == 0:
-            conn.rollback()
-            return 'not_found'
+    def execute(self, sql, params=()):
+        if self.postgres:
+            sql = sql.replace('?', '%s')
+        cursor = self.raw.cursor()
+        cursor.execute(sql, params)
+        return cursor
 
-        # 해당 학생이 등록한 과목·오답 노트·AI 대화의 비밀번호 연결 정보도 함께 수정
-        for table in ('courses', 'wrong_answers', 'chat_conversations'):
-            cursor.execute(f'''
-                UPDATE {table}
-                SET password = ?
-                WHERE student_id = ? AND password = ?
-            ''', (new_password, student_id, old_password))
+    def begin_write(self):
+        """읽은 뒤 고쳐 쓰는 작업 전에 호출. SQLite 는 쓰기 잠금을 먼저 잡는다.
+        PostgreSQL 에서는 SELECT 뒤에 for_update 를 붙여 해당 행을 잠근다."""
+        if not self.postgres:
+            self.raw.execute('BEGIN IMMEDIATE')
 
-        conn.commit()
-        return 'ok'
-    except sqlite3.IntegrityError:
-        # 확인 직후 다른 요청이 같은 비밀번호를 만든 경우 등: 변경 내용 전체 취소
-        conn.rollback()
-        return 'taken'
-    finally:
-        conn.close()
+    @property
+    def for_update(self):
+        return ' FOR UPDATE' if self.postgres else ''
+
+    def commit(self):
+        self.raw.commit()
+
+    def rollback(self):
+        self.raw.rollback()
+
+    def close(self):
+        self.raw.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            self.raw.commit()
+        else:
+            self.raw.rollback()
+        return False
+
 
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    # 학생 및 과목 정보를 관리하는 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS students (
-            student_id TEXT,
-            password TEXT,
-            name TEXT,
-            year TEXT,
-            PRIMARY KEY (student_id, password)
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS courses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id TEXT,
-            password TEXT,
-            name TEXT NOT NULL,
-            semester TEXT NOT NULL,
-            credit INTEGER NOT NULL,
-            grade TEXT NOT NULL,
-            point REAL NOT NULL
-        )
-    ''')
-    # 퀴즈 오답 노트 (학번 + 비밀번호가 일치해야 조회 가능, 계정당 최대 WRONG_ANSWER_LIMIT 개)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS wrong_answers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id TEXT NOT NULL,
-            password TEXT NOT NULL,
-            subject TEXT NOT NULL,
-            question TEXT NOT NULL,
-            choices TEXT NOT NULL,
-            answer INTEGER NOT NULL,
-            selected_answer INTEGER,
-            explanation TEXT NOT NULL,
-            saved_at REAL NOT NULL
-        )
-    ''')
-    # AI 대화 기록 (학번 + 비밀번호가 일치해야 조회 가능, 계정당 최대 CONVERSATION_LIMIT 개)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS chat_conversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id TEXT NOT NULL,
-            password TEXT NOT NULL,
-            title TEXT NOT NULL,
-            messages TEXT NOT NULL,
-            updated_at REAL NOT NULL
-        )
-    ''')
-    # CREATE TABLE IF NOT EXISTS does not upgrade an existing table.
-    columns = {row['name'] for row in conn.execute('PRAGMA table_info(courses)')}
-    if 'password' not in columns:
-        # Legacy rows have no known credential. Preserve them without assigning
-        # them to an arbitrary account; NULL will not match a login password.
-        conn.execute('ALTER TABLE courses ADD COLUMN password TEXT')
-    conn.commit()
-    conn.close()
-
-def save_or_update_student(student_id, name, year, password):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO students (student_id, password, name, year)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(student_id, password) 
-        DO UPDATE SET name=excluded.name, year=excluded.year
-    ''', (student_id, password, name, year))
-    conn.commit()
-    conn.close()
-
-def get_student(student_id, password):
-    # students 테이블에는 별도 id 컬럼이 없으므로 SQLite rowid를 id로 사용
-    conn = get_db_connection()
-    student = conn.execute(
-        'SELECT rowid AS id, * FROM students WHERE student_id = ? AND password = ?',
-        (student_id, password)
-    ).fetchone()
-    conn.close()
-    return student
-
-def get_all_courses(student_id, password):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT * FROM courses 
-        WHERE student_id = ? AND password = ?
-    ''', (student_id, password))
-    courses = cursor.fetchall()
-    conn.close()
-    return courses
-
-def get_course_by_id(course_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM courses WHERE id = ?', (course_id,))
-    course = cursor.fetchone()
-    conn.close()
-    return course
-
-def add_course(student_id, password, name, semester, credit, grade, point):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO courses (student_id, password, name, semester, credit, grade, point)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (student_id, password, name, semester, credit, grade, point))
-    conn.commit()
-    conn.close()
-
-def update_course(course_id, name, semester, credit, grade, point):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE courses
-        SET name = ?, semester = ?, credit = ?, grade = ?, point = ?
-        WHERE id = ?
-    ''', (name, semester, credit, grade, point, course_id))
-    conn.commit()
-    conn.close()
-
-def delete_course(course_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM courses WHERE id = ?', (course_id,))
-    conn.commit()
-    conn.close()
+    url = database_url()
+    if url:
+        import psycopg  # 배포 환경에서만 필요하므로 여기서 불러온다
+        from psycopg.rows import dict_row
+        return Connection(psycopg.connect(url, row_factory=dict_row), postgres=True)
+    Path(DB_NAME).parent.mkdir(parents=True, exist_ok=True)
+    raw = sqlite3.connect(DB_NAME, timeout=10)
+    raw.row_factory = _dict_row
+    raw.execute('PRAGMA foreign_keys = ON')
+    return Connection(raw, postgres=False)
 
 
 # ---------------------------------------------------------------------
-# 퀴즈 오답 노트 (학번 + 비밀번호 단위)
+# 스키마
+# ---------------------------------------------------------------------
+SCHEMA = [
+    '''CREATE TABLE IF NOT EXISTS students (
+        id {pk},
+        student_id TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        year TEXT NOT NULL
+    )''',
+    '''CREATE TABLE IF NOT EXISTS courses (
+        id {pk},
+        user_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        semester TEXT NOT NULL,
+        credit INTEGER NOT NULL,
+        grade TEXT NOT NULL,
+        point DOUBLE PRECISION NOT NULL
+    )''',
+    # 퀴즈 오답 노트 (계정당 최대 WRONG_ANSWER_LIMIT 개)
+    '''CREATE TABLE IF NOT EXISTS wrong_answers (
+        id {pk},
+        user_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL,
+        question TEXT NOT NULL,
+        choices TEXT NOT NULL,
+        answer INTEGER NOT NULL,
+        selected_answer INTEGER,
+        explanation TEXT NOT NULL,
+        saved_at DOUBLE PRECISION NOT NULL
+    )''',
+    # AI 대화 기록 (계정당 최대 CONVERSATION_LIMIT 개)
+    '''CREATE TABLE IF NOT EXISTS chat_conversations (
+        id {pk},
+        user_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        messages TEXT NOT NULL,
+        updated_at DOUBLE PRECISION NOT NULL
+    )''',
+    # 과제 (owner = students.id)
+    '''CREATE TABLE IF NOT EXISTS assignments (
+        id {pk},
+        owner INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL,
+        title TEXT NOT NULL,
+        deadline TEXT NOT NULL,
+        priority INTEGER NOT NULL CHECK (priority BETWEEN 1 AND 3),
+        completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+        estimated_minutes INTEGER NOT NULL DEFAULT 0,
+        checklist TEXT NOT NULL DEFAULT '[]'
+    )''',
+    # AI 생성 퀴즈의 정답·해설 (브라우저 세션 단위, 24시간 후 삭제)
+    '''CREATE TABLE IF NOT EXISTS quizzes (
+        id TEXT PRIMARY KEY,
+        owner TEXT NOT NULL,
+        created DOUBLE PRECISION NOT NULL,
+        subject TEXT NOT NULL,
+        questions TEXT NOT NULL
+    )''',
+    'CREATE INDEX IF NOT EXISTS courses_user ON courses (user_id)',
+    'CREATE INDEX IF NOT EXISTS wrong_answers_user ON wrong_answers (user_id)',
+    'CREATE INDEX IF NOT EXISTS chat_conversations_user ON chat_conversations (user_id)',
+    'CREATE INDEX IF NOT EXISTS assignments_owner ON assignments (owner)',
+    'CREATE INDEX IF NOT EXISTS quizzes_owner ON quizzes (owner, created)',
+]
+
+LEGACY_TABLES = ('students', 'courses', 'wrong_answers', 'chat_conversations')
+
+
+def _retire_legacy_sqlite_tables(conn):
+    """예전 구조(비밀번호 평문, (학번, 비밀번호) 기본키)의 로컬 테이블은 지우지 않고 legacy_* 로 이름만 바꾼다."""
+    columns = {row['name'] for row in conn.execute('PRAGMA table_info(students)').fetchall()}
+    if not columns or 'password_hash' in columns:
+        return
+    suffix = str(int(time.time()))
+    for table in LEGACY_TABLES:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone():
+            conn.execute(f'ALTER TABLE {table} RENAME TO legacy_{table}_{suffix}')
+    print(f'[database] 예전 구조의 테이블을 legacy_*_{suffix} 로 보관했습니다. 새 구조로 다시 만듭니다.')
+
+
+def init_db():
+    conn = get_db_connection()
+    try:
+        with conn:
+            if conn.postgres:
+                # 여러 서버 프로세스가 동시에 테이블을 만들지 않도록 잠금
+                conn.execute('SELECT pg_advisory_xact_lock(1010)')
+                pk = 'SERIAL PRIMARY KEY'
+            else:
+                _retire_legacy_sqlite_tables(conn)
+                pk = 'INTEGER PRIMARY KEY AUTOINCREMENT'
+            for statement in SCHEMA:
+                conn.execute(statement.format(pk=pk))
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------
+# 계정
+# ---------------------------------------------------------------------
+def _public_student(row):
+    if row is None:
+        return None
+    return {'id': row['id'], 'student_id': row['student_id'], 'name': row['name'], 'year': row['year']}
+
+
+def find_student(student_id):
+    conn = get_db_connection()
+    try:
+        row = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
+    finally:
+        conn.close()
+    return _public_student(row)
+
+
+def create_student(student_id, password, name, year):
+    """새 계정을 만든다. 같은 학번이 이미 있으면 None."""
+    conn = get_db_connection()
+    try:
+        with conn:
+            row = conn.execute('''
+                INSERT INTO students (student_id, password_hash, name, year) VALUES (?, ?, ?, ?)
+                ON CONFLICT (student_id) DO NOTHING
+                RETURNING id
+            ''', (student_id, generate_password_hash(password), name, year)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return {'id': row['id'], 'student_id': student_id, 'name': name, 'year': year}
+
+
+def authenticate_student(student_id, password):
+    """학번과 비밀번호가 맞으면 계정 정보, 아니면 None."""
+    conn = get_db_connection()
+    try:
+        row = conn.execute('SELECT * FROM students WHERE student_id = ?', (student_id,)).fetchone()
+    finally:
+        conn.close()
+    if row is None or not check_password_hash(row['password_hash'], password):
+        return None
+    return _public_student(row)
+
+
+def update_student_profile(user_id, name, year):
+    conn = get_db_connection()
+    try:
+        with conn:
+            conn.execute('UPDATE students SET name = ?, year = ? WHERE id = ?', (name, year, user_id))
+    finally:
+        conn.close()
+
+
+def update_student_password(user_id, new_password):
+    """비밀번호 변경. 결과: 'ok' | 'same' | 'not_found'"""
+    conn = get_db_connection()
+    try:
+        with conn:
+            row = conn.execute('SELECT password_hash FROM students WHERE id = ?', (user_id,)).fetchone()
+            if row is None:
+                return 'not_found'
+            if check_password_hash(row['password_hash'], new_password):
+                return 'same'
+            conn.execute('UPDATE students SET password_hash = ? WHERE id = ?',
+                         (generate_password_hash(new_password), user_id))
+        return 'ok'
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------
+# 성적(과목)
+# ---------------------------------------------------------------------
+def get_all_courses(user_id):
+    conn = get_db_connection()
+    try:
+        return conn.execute('SELECT * FROM courses WHERE user_id = ? ORDER BY id', (user_id,)).fetchall()
+    finally:
+        conn.close()
+
+
+def get_course(course_id, user_id):
+    """내 과목이면 반환, 없거나 남의 과목이면 None."""
+    conn = get_db_connection()
+    try:
+        return conn.execute('SELECT * FROM courses WHERE id = ? AND user_id = ?', (course_id, user_id)).fetchone()
+    finally:
+        conn.close()
+
+
+def add_course(user_id, name, semester, credit, grade, point):
+    conn = get_db_connection()
+    try:
+        with conn:
+            conn.execute('''
+                INSERT INTO courses (user_id, name, semester, credit, grade, point)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (user_id, name, semester, credit, grade, point))
+    finally:
+        conn.close()
+
+
+def update_course(course_id, user_id, name, semester, credit, grade, point):
+    conn = get_db_connection()
+    try:
+        with conn:
+            return conn.execute('''
+                UPDATE courses SET name = ?, semester = ?, credit = ?, grade = ?, point = ?
+                WHERE id = ? AND user_id = ?
+            ''', (name, semester, credit, grade, point, course_id, user_id)).rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_course(course_id, user_id):
+    conn = get_db_connection()
+    try:
+        with conn:
+            return conn.execute('DELETE FROM courses WHERE id = ? AND user_id = ?',
+                                (course_id, user_id)).rowcount > 0
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------
+# 퀴즈 오답 노트
 # ---------------------------------------------------------------------
 def _wrong_answer_view(row):
     return {
@@ -200,7 +332,7 @@ def _wrong_answer_view(row):
     }
 
 
-def save_wrong_answers(student_id, password, subject, questions):
+def save_wrong_answers(user_id, subject, questions):
     """틀린 문제 저장. 같은 문제는 새로 덮어쓰고, 최근 WRONG_ANSWER_LIMIT 개만 남긴다."""
     if not questions:
         return
@@ -209,57 +341,55 @@ def save_wrong_answers(student_id, password, subject, questions):
         with conn:
             now = time.time()
             for offset, q in enumerate(questions):
-                conn.execute(
-                    'DELETE FROM wrong_answers WHERE student_id = ? AND password = ? AND question = ?',
-                    (student_id, password, q['question']))
+                conn.execute('DELETE FROM wrong_answers WHERE user_id = ? AND question = ?',
+                             (user_id, q['question']))
                 conn.execute('''
                     INSERT INTO wrong_answers
-                        (student_id, password, subject, question, choices, answer, selected_answer, explanation, saved_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (student_id, password, subject, q['question'], json.dumps(q['choices'], ensure_ascii=False),
+                        (user_id, subject, question, choices, answer, selected_answer, explanation, saved_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, subject, q['question'], json.dumps(q['choices'], ensure_ascii=False),
                       q['answer'], q.get('selected_answer'), q['explanation'], now + offset * 1e-6))
             conn.execute('''
                 DELETE FROM wrong_answers
-                WHERE student_id = ? AND password = ? AND id NOT IN (
-                    SELECT id FROM wrong_answers WHERE student_id = ? AND password = ?
+                WHERE user_id = ? AND id NOT IN (
+                    SELECT id FROM wrong_answers WHERE user_id = ?
                     ORDER BY saved_at DESC, id DESC LIMIT ?)
-            ''', (student_id, password, student_id, password, WRONG_ANSWER_LIMIT))
+            ''', (user_id, user_id, WRONG_ANSWER_LIMIT))
     finally:
         conn.close()
 
 
-def get_wrong_answers(student_id, password):
+def get_wrong_answers(user_id):
     conn = get_db_connection()
     try:
         rows = conn.execute('''
-            SELECT * FROM wrong_answers WHERE student_id = ? AND password = ?
+            SELECT * FROM wrong_answers WHERE user_id = ?
             ORDER BY saved_at DESC, id DESC LIMIT ?
-        ''', (student_id, password, WRONG_ANSWER_LIMIT)).fetchall()
+        ''', (user_id, WRONG_ANSWER_LIMIT)).fetchall()
     finally:
         conn.close()
     return [_wrong_answer_view(row) for row in rows]
 
 
-def delete_wrong_answer(item_id, student_id, password):
+def delete_wrong_answer(item_id, user_id):
     conn = get_db_connection()
     try:
         with conn:
-            cursor = conn.execute('DELETE FROM wrong_answers WHERE id = ? AND student_id = ? AND password = ?',
-                                  (item_id, student_id, password))
-        return cursor.rowcount > 0
+            return conn.execute('DELETE FROM wrong_answers WHERE id = ? AND user_id = ?',
+                                (item_id, user_id)).rowcount > 0
     finally:
         conn.close()
 
 
 # ---------------------------------------------------------------------
-# AI 대화 기록 (학번 + 비밀번호 단위)
+# AI 대화 기록
 # ---------------------------------------------------------------------
 def _conversation_view(row):
     return {'id': row['id'], 'title': row['title'], 'messages': json.loads(row['messages']),
             'updated_at': row['updated_at']}
 
 
-def save_conversation(student_id, password, conversation_id, title, messages):
+def save_conversation(user_id, conversation_id, title, messages):
     """대화 저장(내 대화면 갱신, 아니면 새로 저장). 최근 CONVERSATION_LIMIT 개만 남기고 대화 id 를 돌려준다."""
     conn = get_db_connection()
     try:
@@ -270,42 +400,78 @@ def save_conversation(student_id, password, conversation_id, title, messages):
             if conversation_id is not None:
                 updated = conn.execute('''
                     UPDATE chat_conversations SET title = ?, messages = ?, updated_at = ?
-                    WHERE id = ? AND student_id = ? AND password = ?
-                ''', (title, payload, now, conversation_id, student_id, password)).rowcount
+                    WHERE id = ? AND user_id = ?
+                ''', (title, payload, now, conversation_id, user_id)).rowcount
             if not updated:
                 conversation_id = conn.execute('''
-                    INSERT INTO chat_conversations (student_id, password, title, messages, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (student_id, password, title, payload, now)).lastrowid
+                    INSERT INTO chat_conversations (user_id, title, messages, updated_at)
+                    VALUES (?, ?, ?, ?) RETURNING id
+                ''', (user_id, title, payload, now)).fetchone()['id']
             conn.execute('''
                 DELETE FROM chat_conversations
-                WHERE student_id = ? AND password = ? AND id NOT IN (
-                    SELECT id FROM chat_conversations WHERE student_id = ? AND password = ?
+                WHERE user_id = ? AND id NOT IN (
+                    SELECT id FROM chat_conversations WHERE user_id = ?
                     ORDER BY updated_at DESC, id DESC LIMIT ?)
-            ''', (student_id, password, student_id, password, CONVERSATION_LIMIT))
+            ''', (user_id, user_id, CONVERSATION_LIMIT))
         return conversation_id
     finally:
         conn.close()
 
 
-def get_conversations(student_id, password):
+def get_conversations(user_id):
     conn = get_db_connection()
     try:
         rows = conn.execute('''
-            SELECT * FROM chat_conversations WHERE student_id = ? AND password = ?
+            SELECT * FROM chat_conversations WHERE user_id = ?
             ORDER BY updated_at DESC, id DESC LIMIT ?
-        ''', (student_id, password, CONVERSATION_LIMIT)).fetchall()
+        ''', (user_id, CONVERSATION_LIMIT)).fetchall()
     finally:
         conn.close()
     return [_conversation_view(row) for row in rows]
 
 
-def delete_conversation(conversation_id, student_id, password):
+def delete_conversation(conversation_id, user_id):
     conn = get_db_connection()
     try:
         with conn:
-            cursor = conn.execute('DELETE FROM chat_conversations WHERE id = ? AND student_id = ? AND password = ?',
-                                  (conversation_id, student_id, password))
-        return cursor.rowcount > 0
+            return conn.execute('DELETE FROM chat_conversations WHERE id = ? AND user_id = ?',
+                                (conversation_id, user_id)).rowcount > 0
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------
+# AI 생성 퀴즈 (브라우저 세션 단위)
+# ---------------------------------------------------------------------
+def _purge_old_quizzes(conn):
+    conn.execute('DELETE FROM quizzes WHERE created < ?', (time.time() - QUIZ_LIFETIME_SECONDS,))
+
+
+def latest_quiz_time(owner):
+    conn = get_db_connection()
+    try:
+        row = conn.execute('SELECT created FROM quizzes WHERE owner = ? ORDER BY created DESC LIMIT 1',
+                           (owner,)).fetchone()
+    finally:
+        conn.close()
+    return row['created'] if row else None
+
+
+def save_quiz(quiz_id, owner, subject, questions):
+    conn = get_db_connection()
+    try:
+        with conn:
+            _purge_old_quizzes(conn)
+            conn.execute('INSERT INTO quizzes (id, owner, created, subject, questions) VALUES (?, ?, ?, ?, ?)',
+                         (quiz_id, owner, time.time(), subject, json.dumps(questions, ensure_ascii=False)))
+    finally:
+        conn.close()
+
+
+def get_quiz(quiz_id, owner):
+    conn = get_db_connection()
+    try:
+        return conn.execute('SELECT * FROM quizzes WHERE id = ? AND owner = ? AND created >= ?',
+                            (quiz_id, owner, time.time() - QUIZ_LIFETIME_SECONDS)).fetchone()
     finally:
         conn.close()

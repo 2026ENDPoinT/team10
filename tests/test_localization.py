@@ -1,29 +1,20 @@
 from pathlib import Path
 import tempfile
 import unittest
-import sqlite3
-from unittest.mock import patch
-import database
 from app import app
+from db_helper import use_test_database
 
 
 class LocalizationTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.old_config = dict(app.config)
-        def connect():
-            conn = sqlite3.connect(str(Path(self.directory.name) / 'grades.db'))
-            conn.row_factory = sqlite3.Row
-            return conn
-        self.db_patch = patch('database.get_db_connection', side_effect=connect)
-        self.db_patch.start()
-        database.init_db()
-        app.config.update(TESTING=True, ASSIGNMENTS_DB=str(Path(self.directory.name) / 'tasks.db'))
+        use_test_database(self, self.directory.name)
+        app.config.update(TESTING=True)
         self.client = app.test_client()
         self.client.post('/login', data={'student_id':'12345678','name':'과제명', 'year':'1','password':'test!'})
 
     def tearDown(self):
-        self.db_patch.stop()
         app.config.clear()
         app.config.update(self.old_config)
         self.directory.cleanup()

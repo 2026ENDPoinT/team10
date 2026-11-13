@@ -1,6 +1,5 @@
 """퀴즈 오답 노트(최대 10개)와 AI 대화 기록(최대 3개) 저장 테스트. 실제 database.db 는 건드리지 않는다."""
 import json
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,28 +7,19 @@ from unittest.mock import patch
 
 import database
 from app import app
+from db_helper import use_test_database
 
 
 class StudyRecordTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.previous = dict(app.config)
-        db_path = Path(self.directory.name) / 'grades.db'
-
-        def connect():
-            conn = sqlite3.connect(str(db_path))
-            conn.row_factory = sqlite3.Row
-            return conn
-        self.db_patch = patch('database.get_db_connection', side_effect=connect)
-        self.db_patch.start()
-        database.init_db()
-        app.config.update(TESTING=True, AI_MODE='groq', GROQ_API_KEY='test',
-                          AI_QUIZ_DB=str(Path(self.directory.name) / 'quizzes.db'),
-                          ASSIGNMENTS_DB=str(Path(self.directory.name) / 'tasks.db'))
+        use_test_database(self, self.directory.name)
+        app.config.update(TESTING=True, AI_MODE='groq', GROQ_API_KEY='test')
         self.client = self.login('26101150', 'mine!')
+        self.user_id = database.find_student('26101150')['id']
 
     def tearDown(self):
-        self.db_patch.stop()
         app.config.clear()
         app.config.update(self.previous)
         self.directory.cleanup()
@@ -61,15 +51,17 @@ class StudyRecordTests(unittest.TestCase):
         self.assertEqual(items[1]['explanation'], '해설 2')
         self.assertEqual(items[1]['subject'], '선형대수학')
 
-        # 같은 학번이라도 비밀번호가 다르면 보이지 않음
-        self.assertEqual(self.login('26101150', 'other!').get('/api/wrong-answers').json['items'], [])
+        # 다른 계정에는 보이지 않음
+        self.assertEqual(self.login('26101151', 'other!').get('/api/wrong-answers').json['items'], [])
+        # 같은 학번이라도 비밀번호가 틀리면 로그인되지 않음
+        self.assertEqual(self.login('26101150', 'wrong!').get('/api/wrong-answers').status_code, 401)
         # 로그인하지 않으면 조회 불가
         self.assertEqual(app.test_client().get('/api/wrong-answers').status_code, 401)
 
     def test_wrong_answers_keep_latest_ten_without_duplicates(self):
         for n in range(12):
-            database.save_wrong_answers('26101150', 'mine!', '선형대수학', [{**self.question(n), 'selected_answer': 0}])
-        database.save_wrong_answers('26101150', 'mine!', '선형대수학', [{**self.question(5), 'selected_answer': 2}])
+            database.save_wrong_answers(self.user_id, '선형대수학', [{**self.question(n), 'selected_answer': 0}])
+        database.save_wrong_answers(self.user_id, '선형대수학', [{**self.question(5), 'selected_answer': 2}])
         items = self.client.get('/api/wrong-answers').json['items']
         self.assertEqual(len(items), 10)
         self.assertEqual(items[0]['question'], '문제 5')            # 다시 틀린 문제는 최신으로 갱신
@@ -81,7 +73,7 @@ class StudyRecordTests(unittest.TestCase):
     def test_delete_wrong_answer_is_owner_only_and_same_origin(self):
         self.take_quiz(self.client, [self.question(1)], [0])
         item_id = self.client.get('/api/wrong-answers').json['items'][0]['id']
-        other = self.login('26101150', 'other!')
+        other = self.login('26101151', 'other!')
         self.assertEqual(other.post(f'/api/wrong-answers/{item_id}/delete', json={}).status_code, 404)
         self.assertEqual(self.client.post(f'/api/wrong-answers/{item_id}/delete', json={},
                                           headers={'Origin': 'https://evil.test'}).status_code, 403)
@@ -118,7 +110,7 @@ class StudyRecordTests(unittest.TestCase):
 
     def test_conversations_are_private_validated_and_deletable(self):
         saved = self.client.post('/api/conversations', json={'messages': self.chat('비밀')}).json['id']
-        other = self.login('26101150', 'other!')
+        other = self.login('26101151', 'other!')
         self.assertEqual(other.get('/api/conversations').json['items'], [])
         # 다른 계정이 남의 대화 번호로 저장해도 덮어쓰지 못함
         hijack = other.post('/api/conversations', json={'id': saved, 'messages': self.chat('덮어쓰기')})
@@ -136,13 +128,15 @@ class StudyRecordTests(unittest.TestCase):
         # 막힌 요청(로그인 없음·다른 사이트)은 아무것도 저장하지 않았으므로 삭제 후 목록은 비어 있음
         self.assertEqual(self.client.post(f'/api/conversations/{saved}/delete', json={}).json['items'], [])
 
-    def test_password_change_moves_saved_records(self):
+    def test_password_change_keeps_saved_records(self):
         self.take_quiz(self.client, [self.question(1)], [0])
         self.client.post('/api/conversations', json={'messages': self.chat('기록')})
         self.client.post('/change-password', data={'new_password': 'newpw!'})
         self.assertEqual(len(self.client.get('/api/wrong-answers').json['items']), 1)
         self.assertEqual(len(self.client.get('/api/conversations').json['items']), 1)
-        self.assertEqual(self.login('26101150', 'mine!').get('/api/conversations').json['items'], [])
+        # 예전 비밀번호로는 로그인되지 않고, 새 비밀번호로 로그인하면 같은 기록이 보인다
+        self.assertEqual(self.login('26101150', 'mine!').get('/api/conversations').status_code, 401)
+        self.assertEqual(len(self.login('26101150', 'newpw!').get('/api/conversations').json['items']), 1)
 
     def test_pages_show_saved_sections(self):
         for url, marker in [('/quiz', 'id="wrong-notes"'), ('/ai/', 'id="saved-chats"')]:

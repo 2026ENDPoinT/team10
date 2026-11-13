@@ -8,14 +8,14 @@ from unittest.mock import patch
 
 import app as project
 import database
+from db_helper import use_test_database
 
 
 class IntegratedAppTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.original_db = database.DB_NAME
-        database.DB_NAME = str(Path(self.directory.name) / 'test.db')
-        database.init_db()
+        use_test_database(self, self.directory.name)
         self.old_config = dict(project.app.config)
         project.app.config.update(TESTING=True, SECRET_KEY='test-only-key', AI_MODE='openai',
                                   OPENAI_API_KEY='', YOUTUBE_API_KEY='')
@@ -23,7 +23,6 @@ class IntegratedAppTests(unittest.TestCase):
         self.student = {'student_id': '12345678', 'name': 'Test Student', 'year': '1'}
 
     def tearDown(self):
-        database.DB_NAME = self.original_db
         project.app.config.clear()
         project.app.config.update(self.old_config)
         self.directory.cleanup()
@@ -55,8 +54,9 @@ class IntegratedAppTests(unittest.TestCase):
         self.assertFalse(self.client.get('/ai/api/health').json['configured'])
 
     def test_tutor_uses_actual_quiz_contract_without_touching_grades(self):
-        database.add_course('12345678', '프로그래밍입문(1)', '2026년 1학기', 3, 'A', 4.0)
-        before = [dict(row) for row in database.get_all_courses('12345678')]
+        user_id = database.create_student('12345678', 'test!', 'Test Student', '1')['id']
+        database.add_course(user_id, '프로그래밍입문(1)', '2026년 1학기', 3, 'A', 4.0)
+        before = database.get_all_courses(user_id)
         self.client.get('/quiz', query_string=self.student)
         project.app.config['OPENAI_API_KEY'] = 'test-only-not-real'
         context = json.loads((Path(__file__).parent / 'quiz_context.json').read_text(encoding='utf-8'))
@@ -74,7 +74,7 @@ class IntegratedAppTests(unittest.TestCase):
         self.assertIn(context['questions'][0]['question'], request_data)
         self.assertNotIn('12345678', request_data)
         self.assertNotIn('Test Student', request_data)
-        self.assertEqual(before, [dict(row) for row in database.get_all_courses('12345678')])
+        self.assertEqual(before, database.get_all_courses(user_id))
 
     def test_database_default_belongs_to_copy(self):
         expected = Path(project.__file__).resolve().parent / 'data' / 'database.db'

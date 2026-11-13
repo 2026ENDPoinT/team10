@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from scipy.stats import norm
 
-from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student, get_student, update_student_password
+from database import (init_db, get_all_courses, get_course, add_course, update_course, delete_course, find_student,
+                      create_student, authenticate_student, update_student_profile, update_student_password)
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
@@ -113,19 +114,28 @@ def login():
         flash('학년을 선택해주세요.', 'error')
         return redirect(url_for('index'))
 
-    # 새로 만드는 계정만 규칙 검사 (규칙 도입 전에 만든 기존 계정은 그대로 로그인 가능)
-    if get_student(student_id, password) is None and not is_valid_password(password):
-        flash(PASSWORD_RULE_MESSAGE, 'error')
+    # 학번 하나에 계정 하나. 처음 쓰는 학번이면 계정을 만들고, 이미 있으면 비밀번호를 확인한다.
+    if find_student(student_id) is None:
+        if not is_valid_password(password):
+            flash(PASSWORD_RULE_MESSAGE, 'error')
+            return redirect(url_for('index'))
+        account = create_student(student_id, password, name, year)
+    else:
+        account = authenticate_student(student_id, password)
+        if account is None:
+            flash('학번 또는 비밀번호가 올바르지 않습니다.', 'error')
+            return redirect(url_for('index'))
+        update_student_profile(account['id'], name, year)
+    if account is None:  # 같은 학번 계정이 방금 다른 요청에서 만들어진 경우
+        flash('학번 또는 비밀번호가 올바르지 않습니다.', 'error')
         return redirect(url_for('index'))
 
-    save_or_update_student(student_id, name, year, password)
-
-    account = get_student(student_id, password)
+    # 세션 쿠키에는 비밀번호를 저장하지 않는다 (Flask 세션은 서명만 되고 암호화되지 않음)
     session.clear()
+    session['user_id'] = account['id']
     session['assignment_owner'] = account['id']
     session['assignment_navigation'] = {'student_id': student_id, 'name': name, 'year': year}
     session['student_id'] = student_id
-    session['password'] = password
     session['name'] = name
     session['year'] = year
 
@@ -140,16 +150,15 @@ def logout():
 
 @app.route('/scores', methods=['GET'])
 def scores():
-    if 'student_id' not in session or 'password' not in session:
+    if 'user_id' not in session:
         flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
 
     student_id = session['student_id']
-    password = session['password']
     name = session.get('name', '')
     year = session.get('year', '')
 
-    courses = get_all_courses(student_id, password)
+    courses = get_all_courses(session['user_id'])
     stats = calculate_gpa(courses)
 
     # 성적 등록 칸 아래 목록: 최근 학기부터, 같은 학기는 과목명 순
@@ -176,12 +185,11 @@ def scores():
 
 @app.route('/manage', methods=['GET'])
 def manage():
-    if 'student_id' not in session or 'password' not in session:
+    if 'user_id' not in session:
         flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
 
     student_id = session['student_id']
-    password = session['password']
     name = session['name']
     year = session['year']
 
@@ -189,7 +197,7 @@ def manage():
     search_result_semester = None
     searched = False
 
-    courses = get_all_courses(student_id, password)
+    courses = get_all_courses(session['user_id'])
 
     if selected_search_course:
         searched = True
@@ -212,7 +220,7 @@ def manage():
 
 @app.route('/predict', methods=['GET', 'POST'])
 def predict():
-    if 'student_id' not in session or 'password' not in session:
+    if 'user_id' not in session:
         flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
 
@@ -338,42 +346,35 @@ def quiz():
 
 @app.route('/change-password', methods=['POST'])
 def change_password():
-    if 'student_id' not in session or 'password' not in session:
+    if 'user_id' not in session:
         return redirect(url_for('index'))
     
-    student_id = session['student_id']
-    old_password = session['password']
     new_password = request.form.get('new_password', '').strip()
 
     if not is_valid_password(new_password):
         flash(PASSWORD_RULE_MESSAGE, 'error')
         return redirect(request.referrer or url_for('scores'))
 
-    result = update_student_password(student_id, old_password, new_password)
+    result = update_student_password(session['user_id'], new_password)
     if result == 'same':
         flash('현재 비밀번호와 다른 비밀번호를 입력해주세요.', 'error')
-        return redirect(request.referrer or url_for('scores'))
-    if result == 'taken':
-        flash('같은 학번에서 이미 사용 중인 비밀번호입니다. 다른 비밀번호를 입력해주세요.', 'error')
         return redirect(request.referrer or url_for('scores'))
     if result == 'not_found':
         session.clear()
         flash('계정 정보를 찾을 수 없습니다. 다시 로그인해주세요.', 'error')
         return redirect(url_for('index'))
 
-    session['password'] = new_password
     flash('비밀번호가 성공적으로 변경되었습니다.', 'success')
     
     return redirect(request.referrer or url_for('scores'))
 
 @app.route('/add', methods=['POST'])
 def add():
-    if 'student_id' not in session or 'password' not in session:
+    if 'user_id' not in session:
         flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
 
     student_id = session['student_id']
-    password = session['password']
     name_val = session.get('name', '')
     year = session.get('year', '')
 
@@ -392,7 +393,7 @@ def add():
 
     semester = f"{sel_year}년 {sel_sem}"
 
-    existing_courses = get_all_courses(student_id, password)
+    existing_courses = get_all_courses(session['user_id'])
     for c in existing_courses:
         if c['name'] == course_name:
             flash(f"이미 등록된 과목입니다: '{course_name}' ({c['semester']})", 'error')
@@ -405,21 +406,21 @@ def add():
     credit = COURSE_CREDITS[course_name]
     point = GRADE_POINTS[grade]
     
-    add_course(student_id, password, course_name, semester, credit, grade, point)
+    add_course(session['user_id'], course_name, semester, credit, grade, point)
     flash('과목이 성공적으로 등록되었습니다.', 'success')
     return redirect(url_for('scores', student_id=student_id, name=name_val, year=year))
 
 @app.route('/edit/<int:course_id>', methods=['GET', 'POST'])
 def edit(course_id):
-    if 'student_id' not in session:
+    if 'user_id' not in session:
         return redirect(url_for('index'))
 
     student_id = session['student_id']
     name = session.get('name', '')
     year = session.get('year', '')
 
-    course = get_course_by_id(course_id)
-    if not course or course['student_id'] != student_id or course['password'] != session['password']:
+    course = get_course(course_id, session['user_id'])
+    if not course:
         flash('존재하지 않거나 권한이 없는 과목입니다.', 'error')
         return redirect(url_for('manage'))
 
@@ -447,7 +448,7 @@ def edit(course_id):
 
         semester = f"{sel_year}년 {sel_sem}"
     
-        existing_courses = get_all_courses(student_id, session['password'])
+        existing_courses = get_all_courses(session['user_id'])
         for c in existing_courses:
             if c['id'] != course_id and c['name'] == c_name:
                 flash(f"이미 등록된 과목입니다: '{c_name}' ({c['semester']})", 'error')
@@ -460,7 +461,7 @@ def edit(course_id):
         credit = COURSE_CREDITS[c_name]
         point = GRADE_POINTS[grade]
         
-        update_course(course_id, c_name, semester, credit, grade, point)
+        update_course(course_id, session['user_id'], c_name, semester, credit, grade, point)
         flash('과목 정보가 수정되었습니다.', 'success')
 
         return redirect(url_for('manage'))
@@ -469,12 +470,10 @@ def edit(course_id):
 
 @app.route('/delete/<int:course_id>', methods=['POST'])
 def delete(course_id):
-    if 'student_id' not in session:
+    if 'user_id' not in session:
         return redirect(url_for('index'))
 
-    course = get_course_by_id(course_id)
-    if course and course['student_id'] == session['student_id'] and course['password'] == session['password']:
-        delete_course(course_id)
+    if delete_course(course_id, session['user_id']):
         flash('과목이 삭제되었습니다.', 'success')
     
     return redirect(url_for('manage'))
