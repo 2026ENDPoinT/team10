@@ -16,6 +16,7 @@
         <span class="glass-obj sm g2 round" aria-hidden="true">📈</span>
         <p class="eyebrow">FORECAST</p>
         <h1>{{ t('기말고사') }} <em class="hl">{{ t('목표 석차') }}</em> {{ t('계산') }}</h1>
+        <p class="lead">{{ year }}{{ t('학년') }} · {{ t('학번:') }} {{ student_id }} · {{ name }}{{ t('님 환영합니다!') }}</p>
         <p class="lead">{{ t('중간고사 결과와 목표 등급을 입력하면 기말고사에서 필요한 점수와 석차를 알려드려요.') }}</p>
     </header>
 
@@ -39,10 +40,10 @@
             <div class="stat-row">
                 <div class="stat stat-blue">
                     <span class="stat-value">{{ result.required_final_rank }}<small>/ {{ result.total_students }}</small></span>
-                    <span class="stat-label">🎯 {{ t('기말고사 단독 최소 석차:')|replace(':', '') }} · {{ t('상위') }} {{ result.required_final_ratio }}%</span>
+                    <span class="stat-label">🎯 {{ t('기말고사 단독 최소 석차:')|replace(':', '') }} · {{ t('상위') }} {{ result.required_final_ratio }}% {{ t('이내') }}</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-value">{{ result.required_final_score }}<small>{{ t('점 이상') }}</small></span>
+                    <span class="stat-value">{{ t('약') }} {{ result.required_final_score }}<small>{{ t('점 이상') }}</small></span>
                     <span class="stat-label">📈 {{ t('기말고사 단독 최소 점수:')|replace(':', '') }} {{ t('(평균 및 표준편차 기준)') }}</span>
                 </div>
             </div>
@@ -58,7 +59,7 @@
                 <div class="field-grid">
                     <div class="field">
                         <label for="total_students">{{ t('수강 인원 (명)') }}</label>
-                        <input type="number" id="total_students" name="total_students" value="40" required>
+                        <input type="number" id="total_students" name="total_students" value="40" min="1" required placeholder="{{ t('0 포함 불가 (양수)') }}">
                     </div>
                     <div class="field">
                         <label for="target_grade">{{ t('목표 등급') }}</label>
@@ -73,54 +74,63 @@
                         </select>
                     </div>
                     <div class="field">
+                        <label for="max_score">{{ t('중간고사 최고 점수') }}</label>
+                        <input type="number" step="0.1" id="max_score" name="max_score" value="100" min="1" required>
+                    </div>
+                    <div class="field">
                         <label for="my_mid">{{ t('내 중간고사 점수') }}</label>
-                        <input type="number" step="0.1" id="my_mid" name="my_mid" value="85.5" required>
+                        <input type="number" step="0.1" id="my_mid" name="my_mid" value="85.5" min="0" required placeholder="{{ t('0 이상 최고 점수 이하') }}">
                     </div>
                     <div class="field">
                         <label for="mid_mean">{{ t('중간고사 평균') }}</label>
-                        <input type="number" step="0.1" id="mid_mean" name="mid_mean" value="75.5" required>
+                        <input type="number" step="0.1" id="mid_mean" name="mid_mean" value="75.5" min="0" required placeholder="{{ t('0 이상 최고 점수 이하') }}">
                     </div>
                     <div class="field">
-                        <label for="mid_std">{{ t('중간고사 표준편차') }}</label>
-                        <input type="number" step="0.1" id="mid_std" name="mid_std" value="10.5" required>
-                    </div>
-                    <div class="field-grid" style="margin:0;">
-                        <div class="field">
-                            <label for="mid_weight">{{ t('중간 반영(%)') }}</label>
-                            <input type="number" id="mid_weight" name="mid_weight" value="40" required>
-                        </div>
-                        <div class="field">
-                            <label for="final_weight">{{ t('기말 반영(%)') }}</label>
-                            <input type="number" id="final_weight" name="final_weight" value="40" required>
-                        </div>
+                        <label for="mid_std">{{ t('중간고사 표준편차 (0~100)') }}</label>
+                        <input type="number" step="0.1" id="mid_std" name="mid_std" value="10.5" min="0" max="100" required placeholder="{{ t('0~100 사이 입력') }}">
                     </div>
                 </div>
 
-                <h3 class="form-subtitle">{{ t('📊 상대평가 세부 등급별 비율 설정 (%)') }}</h3>
                 <div class="field-grid cols-3">
                     <div class="field">
-                        <label for="r_aplus">{{ t('A+ 비율 (%)') }}</label>
-                        <input type="number" step="0.1" id="r_aplus" name="r_aplus" value="10" required>
+                        <label for="mid_weight">{{ t('중간 반영(%)') }}</label>
+                        <input type="number" id="mid_weight" name="mid_weight" value="40" min="0" max="100" required>
                     </div>
                     <div class="field">
-                        <label for="r_azero">{{ t('A0 비율 (%)') }}</label>
-                        <input type="number" step="0.1" id="r_azero" name="r_azero" value="20" required>
+                        <label for="final_weight">{{ t('기말 반영(%)') }}</label>
+                        <input type="number" id="final_weight" name="final_weight" value="40" min="0" max="100" required>
                     </div>
                     <div class="field">
-                        <label for="r_bplus">{{ t('B+ 비율 (%)') }}</label>
-                        <input type="number" step="0.1" id="r_bplus" name="r_bplus" value="20" required>
+                        <label for="other_weight">{{ t('기타 반영(%)') }}</label>
+                        <input type="number" id="other_weight" name="other_weight" value="20" readonly title="{{ t('100 - 중간 반영 - 기말 반영') }}">
+                    </div>
+                </div>
+
+                <h3 class="form-subtitle">{{ t('📊 상대평가 등급별 누적 비율 (고정)') }}</h3>
+                <div class="field-grid cols-3">
+                    <div class="field">
+                        <label for="c_aplus">A+</label>
+                        <input type="text" id="c_aplus" value="{{ t('상위 10%') }}" readonly tabindex="-1">
                     </div>
                     <div class="field">
-                        <label for="r_bzero">{{ t('B0 비율 (%)') }}</label>
-                        <input type="number" step="0.1" id="r_bzero" name="r_bzero" value="20" required>
+                        <label for="c_azero">{{ t('A0 이상') }}</label>
+                        <input type="text" id="c_azero" value="{{ t('상위 30% 이하') }}" readonly tabindex="-1">
                     </div>
                     <div class="field">
-                        <label for="r_cplus">{{ t('C+ 비율 (%)') }}</label>
-                        <input type="number" step="0.1" id="r_cplus" name="r_cplus" value="15" required>
+                        <label for="c_bplus">B+</label>
+                        <input type="text" id="c_bplus" value="{{ t('상위 50%') }}" readonly tabindex="-1">
                     </div>
                     <div class="field">
-                        <label for="r_czero">{{ t('C0 비율 (%)') }}</label>
-                        <input type="number" step="0.1" id="r_czero" name="r_czero" value="15" required>
+                        <label for="c_bzero">{{ t('B0 이상') }}</label>
+                        <input type="text" id="c_bzero" value="{{ t('상위 70% 이하') }}" readonly tabindex="-1">
+                    </div>
+                    <div class="field">
+                        <label for="c_cplus">C+</label>
+                        <input type="text" id="c_cplus" value="{{ t('상위 85%') }}" readonly tabindex="-1">
+                    </div>
+                    <div class="field">
+                        <label for="c_czero">{{ t('C0 이상') }}</label>
+                        <input type="text" id="c_czero" value="{{ t('상위 100% 이하') }}" readonly tabindex="-1">
                     </div>
                 </div>
 
@@ -130,5 +140,41 @@
     </main>
 
     {% include '_footer.html' %}
+
+    <script>
+        const midWeightInput = document.getElementById('mid_weight');
+        const finalWeightInput = document.getElementById('final_weight');
+        const otherWeightInput = document.getElementById('other_weight');
+        const maxScoreInput = document.getElementById('max_score');
+        const myMidInput = document.getElementById('my_mid');
+        const midMeanInput = document.getElementById('mid_mean');
+
+        function updateOtherWeight() {
+            const mid = parseFloat(midWeightInput.value) || 0;
+            const final = parseFloat(finalWeightInput.value) || 0;
+            const other = 100 - mid - final;
+            otherWeightInput.value = other;
+            if (other < 0) {
+                otherWeightInput.style.color = 'red';
+                otherWeightInput.style.fontWeight = 'bold';
+            } else {
+                otherWeightInput.style.color = '';
+                otherWeightInput.style.fontWeight = '';
+            }
+        }
+
+        function updateMaxScoreLimit() {
+            const maxVal = maxScoreInput.value;
+            myMidInput.max = maxVal;
+            midMeanInput.max = maxVal;
+        }
+
+        midWeightInput.addEventListener('input', updateOtherWeight);
+        finalWeightInput.addEventListener('input', updateOtherWeight);
+        maxScoreInput.addEventListener('input', updateMaxScoreLimit);
+
+        updateOtherWeight();
+        updateMaxScoreLimit();
+    </script>
 </body>
 </html>
