@@ -73,6 +73,16 @@ def save_or_update_student(student_id, name, year, password):
     conn.commit()
     conn.close()
 
+def get_student(student_id, password):
+    # students 테이블에는 별도 id 컬럼이 없으므로 SQLite rowid를 id로 사용
+    conn = get_db_connection()
+    student = conn.execute(
+        'SELECT rowid AS id, * FROM students WHERE student_id = ? AND password = ?',
+        (student_id, password)
+    ).fetchone()
+    conn.close()
+    return student
+
 def get_all_courses(student_id, password):
     conn = get_db_connection()
     cursor = conn.cursor()

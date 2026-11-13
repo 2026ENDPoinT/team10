@@ -6,8 +6,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session
+from scipy.stats import norm
 
-from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student, get_student, get_db_connection
+from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student, get_student, update_student_password
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
@@ -96,9 +97,6 @@ def login():
     session.clear()
     session['assignment_owner'] = account['id']
     session['assignment_navigation'] = {'student_id': student_id, 'name': name, 'year': year}
-    return redirect(url_for('scores', student_id=student_id, name=name, year=year, password=password))
-
-
     session['student_id'] = student_id
     session['password'] = password
     session['name'] = name
@@ -119,16 +117,10 @@ def scores():
         flash('로그인이 필요합니다.', 'error')
         return redirect(url_for('index'))
 
-
-    if not password and session.get('assignment_owner'):
-        conn = get_db_connection()
-        try:
-            account = conn.execute('SELECT password FROM students WHERE id=? AND student_id=?',
-                (session['assignment_owner'], student_id)).fetchone()
-            if account:
-                password = account['password']
-        finally:
-            conn.close()
+    student_id = session['student_id']
+    password = session['password']
+    name = session.get('name', '')
+    year = session.get('year', '')
 
     courses = get_all_courses(student_id, password)
     stats = calculate_gpa(courses)
