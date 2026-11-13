@@ -97,6 +97,7 @@ init_study_records(app)
 def index():
     return render_template('index.html')
 
+"""
 @app.route('/login', methods=['POST'])
 def login():
     student_id = request.form.get('student_id', '').strip()
@@ -115,6 +116,7 @@ def login():
     if not year:
         flash('학년을 선택해주세요.', 'error')
         return redirect(url_for('index'))
+
 
     # 학번 하나에 계정 하나. 처음 쓰는 학번이면 계정을 만들고, 이미 있으면 비밀번호를 확인한다.
     if find_student(student_id) is None:
@@ -142,6 +144,45 @@ def login():
     session['year'] = year
 
     return redirect(url_for('scores'))
+"""
+@app.route('/login', methods=['POST'])
+def login():
+    student_id = request.form.get('student_id', '').strip()
+    name = request.form.get('name', '').strip()
+    year = request.form.get('year', '').strip()
+    password = request.form.get('password', '').strip()
+
+    if not re.match(r'^[1-9][0-9]{7}$', student_id):
+        flash('학번은 0으로 시작하지 않는 8자리 숫자여야 합니다.', 'error')
+        return redirect(url_for('index'))
+
+    if not name:
+        flash('이름을 입력해주세요.', 'error')
+        return redirect(url_for('index'))
+
+    if not year:
+        flash('학년을 선택해주세요.', 'error')
+        return redirect(url_for('index'))
+
+    # 새로 만드는 계정만 규칙 검사 (규칙 도입 전에 만든 기존 계정은 그대로 로그인 가능)
+    if get_student(student_id, password) is None and not is_valid_password(password):
+        flash(PASSWORD_RULE_MESSAGE, 'error')
+        return redirect(url_for('index'))
+
+    save_or_update_student(student_id, name, year, password)
+
+    account = get_student(student_id, password)
+    session.clear()
+    session['assignment_owner'] = account['id']
+    session['assignment_navigation'] = {'student_id': student_id, 'name': name, 'year': year}
+    session['student_id'] = student_id
+    session['password'] = password
+    session['name'] = name
+    session['year'] = year
+
+    return redirect(url_for('scores'))
+
+
 
 @app.route('/logout')
 def logout():
