@@ -5,6 +5,16 @@
   <title>{{ t('과제 관리 · Team 10') }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 {% include '_language_assets.html' %}
+<style>
+ .task-planning-fields{grid-column:1/-1;display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,2fr);gap:16px}
+ .task-estimate{display:flex;gap:8px}.task-estimate input{min-width:0;width:90px}
+ .task-planning-fields textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5d1;border-radius:12px;padding:12px;font:inherit}
+ .task-progress{width:100%;height:10px;accent-color:#386c56;margin:8px 0 12px}
+ .task-step{display:flex;align-items:center;gap:10px;margin:8px 0}
+ .task-step button{background:transparent;border:1px solid #b9c7bd;border-radius:6px;min-width:30px;min-height:30px;cursor:pointer;color:inherit}
+ .task-step .done{text-decoration:line-through;color:#65756c}
+ @media(max-width:600px){.task-planning-fields{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 {% set active_page = 'assignments' %}{% include 'island.html' %}
@@ -52,6 +62,16 @@
     <label>{{ t('중요도') }}<select name="priority">{% for value,text in [(3,'높음'),(2,'보통'),(1,'낮음')] %}
       <option value="{{ value }}" {% if (item and item.priority == value) or (not item and value == 2) %}selected{% endif %}>{{ text |ui_text }}</option>
     {% endfor %}</select></label>
+    <div class="task-planning-fields">
+      <div><label>{{ t('예상 작업 시간') }}</label><div class="task-estimate">
+        <label>{{ t('시간') }}<input type="number" name="estimated_hours" min="0" max="999" value="{{ item.estimated_minutes // 60 if item else 0 }}"></label>
+        <label>{{ t('분') }}<input type="number" name="estimated_minutes" min="0" max="59" value="{{ item.estimated_minutes % 60 if item else 0 }}"></label>
+      </div></div>
+      <label>{{ t('체크리스트 (한 줄에 하나)') }}
+        <textarea name="checklist" rows="4" maxlength="2020" placeholder="{{ t('자료 조사 → 목차 작성 → 본문 작성 → 검토 후 제출 순으로 한 줄씩 입력하세요.') }}">{{ item.steps_text if item else '' }}</textarea>
+        <small>{{ t('최대 20개 · 각 100자 · 기존 항목의 내용을 바꾸면 체크가 해제됩니다.') }}</small>
+      </label>
+    </div>
   </div>
   {% endmacro %}
 
@@ -71,7 +91,7 @@
     </div>
     {% if loop.first %}<p class="task-meta" style="margin-bottom:16px;">{{ t('마감이 가까운 순 · 같은 마감이면 중요도 높은 순') }}</p>{% endif %}
     {% for item in items %}
-    <article class="task-card {{ 'task-done' if item.completed else '' }}">
+    <article id="task-{{ item.id }}" class="task-card {{ 'task-done' if item.completed else '' }}">
       <p class="task-meta">{{ item.subject|ui_text }}</p><h3>{{ item.title }}</h3>
       {% if item.completed %}
       <span class="task-badge">{{ t('✓ 제출 완료') }}</span>
@@ -79,12 +99,31 @@
       <span class="task-badge" data-task-deadline="{{ item.deadline }}+09:00">{{ deadline_label(item.deadline)|ui_text }}</span>
       {% endif %}
       <p>{{ t('마감') }} {{ item.deadline|replace('T',' ') }} {{ t('· 중요도') }} {{ {1:'낮음',2:'보통',3:'높음'}[item.priority]|ui_text }}</p>
+      <p>{{ t('예상 작업 시간') }}:
+        {% if item.estimated_minutes %}
+          {% if item.estimated_minutes // 60 %}{{ item.estimated_minutes // 60 }}{{ t('시간') }}{% endif %}
+          {% if item.estimated_minutes % 60 %} {{ item.estimated_minutes % 60 }}{{ t('분') }}{% endif %}
+        {% else %}{{ t('미설정') }}{% endif %}
+        · <strong>{{ t('진행률') }} {{ item.progress }}%</strong>
+        ({{ item.done_count }}/{{ item.steps|length }})
+      </p>
+      <progress class="task-progress" value="{{ item.progress }}" max="100" aria-label="{{ t('진행률') }}">{{ item.progress }}%</progress>
+      {% for step in item.steps %}
+      <form class="task-step" method="post" action="{{ url_for('assignments.check_step',item_id=item.id,step_index=loop.index0) }}">
+        <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">
+        <input type="hidden" name="done" value="{{ 0 if step.done else 1 }}">
+        <button type="submit" role="checkbox" aria-checked="{{ 'true' if step.done else 'false' }}" aria-label="{{ step.text }}">{{ '☑' if step.done else '☐' }}</button>
+        <span class="{{ 'done' if step.done else '' }}">{{ step.text }}</span>
+      </form>
+      {% else %}<p class="task-meta">{{ t('과제 수정에서 할 일을 추가해 보세요.') }}</p>{% endfor %}
+      {% if item.steps and item.progress == 100 and not item.completed %}<p>{{ t('모든 할 일을 마쳤어요. 실제 제출 후 제출 완료를 눌러 주세요.') }}</p>{% endif %}
       <details><summary>{{ t('과제 수정') }}</summary>
         <form method="post" action="{{ url_for('assignments.save',item_id=item.id) }}">
           <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">{{ fields(item) }}<button class="btn-primary">{{ t('변경 저장') }}</button>
         </form>
       </details>
       <div class="task-actions">
+        <a class="btn-secondary" href="{{ url_for('study_ai.index', assignment_id=item.id) }}">{{ t('AI랑 계획하기') }}</a>
         <form method="post" action="{{ url_for('assignments.change',item_id=item.id,action='restore' if item.completed else 'complete') }}">
           <input type="hidden" name="csrf_token" value="{{ assignment_csrf() }}">
           <button class="{{ 'btn-secondary' if item.completed else 'btn-primary' }}">{{ t('할 일로 되돌리기') if item.completed else t('✓ 제출 완료') }}</button>

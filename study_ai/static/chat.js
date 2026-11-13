@@ -117,7 +117,7 @@ const chatText = value => typeof uiText === 'function' ? uiText(value) : value;
   // After merging, the existing quiz sends context on the SAME origin using the bridge.
   try {
     const raw = sessionStorage.getItem('team10.studyQuizContext');
-    if (raw) {
+    if (raw && !document.getElementById('assignment-plan-context')) {
       sessionStorage.removeItem('team10.studyQuizContext');
       const context = JSON.parse(raw);
       if (!context || typeof context.subject !== 'string' || !Array.isArray(context.questions) ||
@@ -126,4 +126,14 @@ const chatText = value => typeof uiText === 'function' ? uiText(value) : value;
       setContext(context);
     }
   } catch (_) { quizContext = null; showError('The quiz context could not be loaded. Return to the quiz and try again.'); }
+  const planElement = document.getElementById('assignment-plan-context');
+  if (planElement) {
+    const plan = JSON.parse(planElement.textContent);
+    quizContext = null;
+    const prompt = window.UI_LANGUAGE === 'en'
+      ? 'Help me plan this assignment. Ask how much time I can spend today, then suggest realistic steps based on the deadline and unfinished tasks. Do not claim to have saved changes or submitted the assignment. Assignment data:\n'
+      : '이 과제를 함께 계획해 주세요. 오늘 사용할 수 있는 시간을 먼저 물어보고, 마감과 미완료 할 일을 바탕으로 현실적인 순서를 제안해 주세요. 과제를 저장하거나 제출했다고 말하지 마세요. 과제 정보:\n';
+    input.value = prompt + JSON.stringify(plan, null, 2);
+    input.focus();
+  }
 })();

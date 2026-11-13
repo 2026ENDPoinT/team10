@@ -22,6 +22,17 @@
 
   <main class="shell" data-endpoint="{{ url_for('study_ai.chat') }}">
     <aside class="shell-side">
+      {% if assignment_plan %}
+      <section class="context-card">
+        <h2>{{ t('과제 계획') }}</h2>
+        <strong>{{ assignment_plan.title }}</strong>
+        <p>{{ t('마감') }}: {{ assignment_plan.deadline_kst|replace('T',' ') }} (KST)</p>
+        <p>{{ t('진행률') }}: {{ assignment_plan.progress_percent }}%</p>
+        <p>{{ t('과제 정보가 질문 초안에 준비됐어요. 확인 후 보내 주세요.') }}</p>
+        <a href="{{ url_for('assignments.index') }}">{{ t('과제로 돌아가기') }}</a>
+      </section>
+      <script id="assignment-plan-context" type="application/json">{{ assignment_plan|tojson }}</script>
+      {% endif %}
       <section class="context-card" aria-labelledby="context-heading">
         <h2 id="context-heading">{{ t('퀴즈 학습 자료') }} <span id="context-count">0</span></h2>
         <p id="context-summary">{{ t('연결된 퀴즈가 없습니다. 일반 학습 질문도 할 수 있어요.') }}</p>

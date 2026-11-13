@@ -428,7 +428,24 @@
   "함께 공부하는": "Study together with your",
   "핵심 기능": "Core features",
   "이미 지난 시간을 입력할 수 없습니다.": "You cannot enter a date or time in the past.",
+
   "학습 주제 (필수)": "Study topic (required)",
   "문제 수 (1~5)": "Number of questions (1–5)",
   "학습 주제를 한 글자 이상 입력해 주세요.": "Enter a study topic (at least one character)."
+
+  "예상 작업 시간": "Estimated work time",
+  "분": "min",
+  "체크리스트 (한 줄에 하나)": "Checklist (one task per line)",
+  "자료 조사 → 목차 작성 → 본문 작성 → 검토 후 제출 순으로 한 줄씩 입력하세요.": "Enter one step per line, e.g. Research, Outline, Draft, Review and submit.",
+  "최대 20개 · 각 100자 · 기존 항목의 내용을 바꾸면 체크가 해제됩니다.": "Up to 20 steps, 100 characters each. Renaming a step resets its check.",
+  "미설정": "Not set",
+  "진행률": "Progress",
+  "과제 수정에서 할 일을 추가해 보세요.": "Add checklist steps under Edit assignment.",
+  "모든 할 일을 마쳤어요. 실제 제출 후 제출 완료를 눌러 주세요.": "All steps are done. Mark as submitted after you actually submit your work.",
+  "AI랑 계획하기": "Plan with AI",
+  "과제 계획": "Assignment plan",
+  "과제 정보가 질문 초안에 준비됐어요. 확인 후 보내 주세요.": "Your task details are in the message draft. Review and send it to start planning.",
+  "과제로 돌아가기": "Back to assignments",
+  "예상 시간과 체크리스트를 확인해 주세요. 할 일은 중복 없이 최대 20개, 각 100자입니다.": "Check the estimate and checklist: up to 20 unique steps, each up to 100 characters."
+
 }
