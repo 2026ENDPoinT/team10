@@ -1,5 +1,12 @@
+{# KOR / ENG 전환 토글: 현재 언어 쪽이 강조되고, 반대쪽을 누르면 switchSiteLanguage() 로 전환 #}
 <div class="site-language-bar">
-  <button type="button" class="site-language-button" onclick="switchSiteLanguage()"
-          aria-label="{{ '한국어로 전환' if ui_language == 'en' else 'Switch to English' }}"
-          lang="{{ 'ko' if ui_language == 'en' else 'en' }}">🌐 {{ '한국어' if ui_language == 'en' else 'ENG' }}</button>
+  <div class="site-language-toggle" role="group" aria-label="Language / 언어">
+    {% if ui_language == 'en' %}
+      <button type="button" class="site-language-option" onclick="switchSiteLanguage()" lang="ko" aria-label="한국어로 전환">KOR</button>
+      <button type="button" class="site-language-option is-active" aria-pressed="true" lang="en">ENG</button>
+    {% else %}
+      <button type="button" class="site-language-option is-active" aria-pressed="true" lang="ko">KOR</button>
+      <button type="button" class="site-language-option" onclick="switchSiteLanguage()" lang="en" aria-label="Switch to English">ENG</button>
+    {% endif %}
+  </div>
 </div>

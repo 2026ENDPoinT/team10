@@ -1,61 +1,96 @@
+{#
+  다이나믹 아일랜드 (모든 화면 공통, 화면 위에 고정)
+  - 맨 앞: 🏠 홈 버튼
+  - 로그인 상태: 이름 첫 글자 버튼에 마우스를 올리면 학년/학번/이름 카드 표시
+  - 로그아웃 상태(퀴즈·AI 화면을 바로 연 경우): 로그인 버튼 표시
+  - 맨 끝: KOR / ENG 전환
+#}
+{% set island_logged_in = session.get('student_id') %}
+{% set island_name = name or session.get('name', '') %}
+{% set island_year = year or session.get('year', '') %}
+{% set island_student_id = student_id or session.get('student_id', '') %}
 <div class="island-wrap">
-    <nav class="island" id="island">
-        <span class="island-logo">🎓</span>
+    <nav class="island" id="island" aria-label="{{ t('주요 메뉴') }}">
+        <a class="island-home" href="{{ url_for('index') }}" title="{{ t('처음 화면으로') }}" aria-label="{{ t('처음 화면으로') }}">🏠</a>
 
         <a class="island-btn {% if active_page == 'quiz' %}active{% endif %}"
-           href="{{ url_for('quiz', student_id=student_id, name=name, year=year) }}">🧠 QUIZ</a>
+           href="{{ url_for('quiz', student_id=island_student_id, name=island_name, year=island_year) }}"><span aria-hidden="true">🧠</span><span class="island-label">QUIZ</span></a>
 
         <a class="island-btn {% if active_page == 'ai' %}active{% endif %}"
-           href="{{ url_for('study_ai.index') }}">🤖 AI</a>
+           href="{{ url_for('study_ai.index') }}"><span aria-hidden="true">🤖</span><span class="island-label">AI</span></a>
 
+        {% if island_logged_in %}
         <a class="island-btn {% if active_page == 'scores' %}active{% endif %}"
-           href="{{ url_for('scores') }}">{{ t('📊 성적') }}</a>
+           href="{{ url_for('scores') }}"><span aria-hidden="true">📊</span><span class="island-label">{{ t('성적') }}</span></a>
 
         <a class="island-btn {% if active_page == 'manage' %}active{% endif %}"
-           href="{{ url_for('manage') }}">{{ t('⚙️ 관리') }}</a>
+           href="{{ url_for('manage') }}"><span aria-hidden="true">⚙️</span><span class="island-label">{{ t('관리') }}</span></a>
 
         <a class="island-btn {% if active_page == 'predict' %}active{% endif %}"
-           href="{{ url_for('predict') }}">{{ t('🎯 예측') }}</a>
+           href="{{ url_for('predict') }}"><span aria-hidden="true">🎯</span><span class="island-label">{{ t('예측') }}</span></a>
 
-        <a class="island-btn {% if active_page == 'assignments' %}active{% endif %}" href="{{ url_for('assignments.index') }}">{{ t('📅 과제') }}</a>
+        <a class="island-btn {% if active_page == 'assignments' %}active{% endif %}"
+           href="{{ url_for('assignments.index') }}"><span aria-hidden="true">📅</span><span class="island-label">{{ t('과제') }}</span></a>
+
         <span class="island-divider"></span>
 
-        <div class="island-profile" title="{{ t('현재 로그인한 학적 정보') }}">
-            <span class="island-avatar">{{ name[:1] }}</span>
-            <span class="island-profile-text">{{ year }}{{ t('학년 ·') }} {{ student_id }} · {{ name }}</span>
+        <!-- 이름 첫 글자 버튼: 마우스를 올리거나(포커스) 하면 아래에 학적 정보가 뜸 -->
+        <div class="island-profile">
+            <button type="button" class="island-avatar" aria-describedby="islandProfileCard" aria-label="{{ t('현재 로그인한 학적 정보') }}">{{ island_name[:1] }}</button>
+            <div class="island-profile-card" id="islandProfileCard" role="tooltip">
+                <p class="island-profile-title">{{ t('현재 로그인한 학적 정보') }}</p>
+                <dl>
+                    <dt>{{ t('학년') }}</dt><dd>{{ t(island_year ~ '학년') }}</dd>
+                    <dt>{{ t('학번') }}</dt><dd>{{ island_student_id }}</dd>
+                    <dt>{{ t('이름') }}</dt><dd>{{ island_name }}</dd>
+                </dl>
+                <button type="button" class="profile-action" data-open-password>{{ t('🔑 비번변경') }}</button>
+                <a class="profile-logout" href="{{ url_for('logout') }}">{{ t('로그아웃') }}</a>
+            </div>
         </div>
 
-        <button type="button" id="openPasswordModal" class="island-btn" style="background: #ffc107; border: none; cursor: pointer; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 13px;" title="{{ t('비밀번호 변경') }}">{{ t('🔑 비번변경') }}</button>
+        <button type="button" id="openPasswordModal" class="island-btn ghost" title="{{ t('비밀번호 변경') }}"><span aria-hidden="true">🔑</span><span class="island-label">{{ t('비번변경') }}</span></button>
+        {% else %}
+        <span class="island-divider"></span>
+        <a class="island-btn active" href="{{ url_for('index') }}#login"><span aria-hidden="true">🔐</span><span class="island-label">{{ t('로그인') }}</span></a>
+        {% endif %}
 
         {% include '_language_button.html' %}
-
-        <a class="island-home" href="{{ url_for('index') }}" title="{{ t('처음 화면으로') }}">🏠</a>
     </nav>
 </div>
 
+{% if island_logged_in %}
 <!-- 비밀번호 변경 모달 팝업 -->
-<div id="passwordModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
-    <div style="background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
-        <h3 style="margin-top: 0; margin-bottom: 15px; color: #333;">{{ t('🔐 비밀번호 변경') }}</h3>
+<div id="passwordModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+    <div class="modal-card">
+        <h3 id="passwordModalTitle">{{ t('🔐 비밀번호 변경') }}</h3>
         <form action="{{ url_for('change_password') }}" method="POST">
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; font-size: 13px; margin-bottom: 5px; font-weight: bold;">{{ t('새 비밀번호') }}</label>
-                <input type="password" name="new_password" placeholder="{{ t('특수문자(!@#$%^&*) 포함') }}" required style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            <div class="field">
+                <label for="new_password">{{ t('새 비밀번호') }}</label>
+                <input type="password" id="new_password" name="new_password" placeholder="{{ t('특수문자(!@#$%^&*) 포함') }}" required>
             </div>
-            <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" id="closePasswordModal" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">{{ t('취소') }}</button>
-                <button type="submit" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">{{ t('변경하기') }}</button>
+            <div class="modal-actions">
+                <button type="button" id="closePasswordModal" class="btn-secondary">{{ t('취소') }}</button>
+                <button type="submit" class="btn-primary">{{ t('변경하기') }}</button>
             </div>
         </form>
     </div>
 </div>
+{% endif %}
 
 <script>
-    const modal = document.getElementById('passwordModal');
-    const openBtn = document.getElementById('openPasswordModal');
-    const closeBtn = document.getElementById('closePasswordModal');
+    (function () {
+        const island = document.getElementById('island');
+        const onScroll = () => island.classList.toggle('scrolled', window.scrollY > 10);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
 
-    openBtn.addEventListener('click', () => { modal.style.display = 'flex'; });
-    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-    window.addEventListener('click', (e) => { if (e.target === modal) { modal.style.display = 'none'; } });
+        const modal = document.getElementById('passwordModal');
+        if (!modal) return;
+        document.querySelectorAll('#openPasswordModal, [data-open-password]').forEach((btn) =>
+            btn.addEventListener('click', () => modal.classList.add('open')));
+        document.getElementById('closePasswordModal').addEventListener('click', () => modal.classList.remove('open'));
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.classList.remove('open'); });
+    })();
 </script>

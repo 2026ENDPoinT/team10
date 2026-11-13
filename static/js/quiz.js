@@ -209,7 +209,7 @@ async function startQuiz() {
             quizQuestions = data.questions;
             userAnswers = new Array(quizQuestions.length).fill(null);
             currentIndex = 0;
-            quizSubjectLabel.textContent = '- ' + subject + quizText(' · AI 생성');
+            quizSubjectLabel.textContent = subject + quizText(' · AI 생성');
             status.textContent = data.usage?.total_tokens ? quizText('이번 생성 사용량: ') + data.usage.total_tokens + quizText('토큰') : quizText('생성 완료');
             renderQuestion();
             showSection('play');
@@ -230,7 +230,7 @@ async function startQuiz() {
     userAnswers = new Array(quizQuestions.length).fill(null);
     currentIndex = 0;
 
-    quizSubjectLabel.textContent = '- ' + subject;
+    quizSubjectLabel.textContent = subject;
     renderQuestion();
     showSection('play');
 }

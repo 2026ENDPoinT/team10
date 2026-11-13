@@ -2,15 +2,23 @@
 <html lang="{{ ui_language }}">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ t('성적 수정') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 {% include '_language_assets.html' %}
 </head>
 <body>
-{% include '_language_button.html' %}
-    <div class="container">
-        <h1>{{ t('✏️ 과목 정보 수정') }}</h1>
+    {% set active_page = 'manage' %}
+    {% include 'island.html' %}
 
+    <header class="page-hero">
+        <span class="glass-obj g1 round" aria-hidden="true">✏️</span>
+        <p class="eyebrow">EDIT</p>
+        <h1><em class="hl">{{ t('✏️ 과목 정보 수정') }}</em></h1>
+        <p class="lead">{{ course.name|ui_text }} · {{ course.semester|ui_text }}</p>
+    </header>
+
+    <main class="container" style="max-width:720px;">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flash-messages">
@@ -21,59 +29,66 @@
             {% endif %}
         {% endwith %}
 
-        <div class="form-card">
+        <section class="form-card">
+            <h2>{{ t('✏️ 과목 정보 수정') }}</h2>
             <form action="{{ url_for('edit', course_id=course.id) }}" method="POST">
-                <div class="form-group" style="margin-bottom:15px;">
-                    <label>{{ t('과목명 선택') }}</label>
-                    <select name="name_input" id="edit_course_select" required style="width:100%; padding:8px;">
-                        {% for sem, courses in curriculum.items() %}
-                            <optgroup label="{{ sem }}">
-                                {% for c in courses %}
-                                    <option value="{{ c }}" data-credit="{{ course_credits[c] }}" {% if course.name == c %}selected{% endif %}>{{ c |ui_text }} ({{ course_credits[c] }}{{ t('학점)') }}</option>
-                                {% endfor %}
-                            </optgroup>
-                        {% endfor %}
-                    </select>
-                </div>
+                <div class="field-grid">
+                    <div class="field span-all">
+                        <label for="edit_course_select">{{ t('과목명 선택') }}</label>
+                        <select name="name_input" id="edit_course_select" required>
+                            {% for sem, courses in curriculum.items() %}
+                                <optgroup label="{{ sem|ui_text }}">
+                                    {% for c in courses %}
+                                        <option value="{{ c }}" data-credit="{{ course_credits[c] }}" {% if course.name == c %}selected{% endif %}>{{ c |ui_text }} ({{ course_credits[c] }}{{ t('학점)') }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                <div class="form-group" style="margin-bottom:15px;">
-                    <label>{{ t('수강 연도 및 학기 선택') }}</label>
-                    <div style="display: flex; gap: 10px;">
-                        <select name="semester_year" required style="flex: 1; padding: 8px;">
+                    <div class="field">
+                        <label for="edit_year">{{ t('수강 연도 및 학기 선택') }}</label>
+                        <select name="semester_year" id="edit_year" required>
                             {% for y in range(2016, 2037) %}
                                 <option value="{{ y }}" {% if y|string == curr_year %}selected{% endif %}>{{ y }}{{ t('년') }}</option>
                             {% endfor %}
                         </select>
-                        <select name="semester_term" required style="flex: 1; padding: 8px;">
+                    </div>
+                    <div class="field">
+                        <label for="edit_term" style="visibility:hidden;">{{ t('학기 선택') }}</label>
+                        <select name="semester_term" id="edit_term" required aria-label="{{ t('학기 선택') }}">
                             {% for term in allowed_semesters %}
                                 <option value="{{ term }}" {% if term == curr_term %}selected{% endif %}>{{ term|ui_text }}</option>
                             {% endfor %}
                         </select>
                     </div>
+
+                    <div class="field">
+                        <label for="edit_credit_input">{{ t('학점 수 (자동 입력)') }}</label>
+                        <input type="number" name="credit" id="edit_credit_input" value="{{ course.credit }}" readonly required>
+                    </div>
+                    <div class="field">
+                        <label for="edit_grade">{{ t('성적 등급') }}</label>
+                        <select name="grade" id="edit_grade" required>
+                            {% for g in grades %}
+                                <option value="{{ g }}" {% if course.grade == g %}selected{% endif %}>{{ g }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
 
-                <div class="form-group" style="margin-bottom:15px;">
-                    <label>{{ t('학점 수 (자동 입력)') }}</label>
-                    <input type="number" name="credit" id="edit_credit_input" value="{{ course.credit }}" readonly required style="width:100%; padding:8px; background-color: #e9ecef; cursor: not-allowed;">
+                <div class="btn-row">
+                    <button type="submit" class="btn-primary">{{ t('수정 완료') }}</button>
+                    <a href="{{ url_for('manage') }}" class="btn-back">{{ t('돌아가기') }}</a>
                 </div>
-
-                <div class="form-group" style="margin-bottom:15px;">
-                    <label>{{ t('성적 등급') }}</label>
-                    <select name="grade" required style="width:100%; padding:8px;">
-                        {% for g in grades %}
-                            <option value="{{ g }}" {% if course.grade == g %}selected{% endif %}>{{ g }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <button type="submit" class="btn-primary">{{ t('수정 완료') }}</button>
-                <a href="{{ url_for('scores') }}" class="btn-back" style="margin-left:10px;">{{ t('돌아가기') }}</a>
             </form>
-        </div>
-    </div>
+        </section>
+    </main>
+
+    {% include '_footer.html' %}
 
     <script>
-        document.getElementById('edit_course_select').addEventListener('change', function() {
+        document.getElementById('edit_course_select').addEventListener('change', function () {
             var selectedOption = this.options[this.selectedIndex];
             var credit = selectedOption.getAttribute('data-credit');
             document.getElementById('edit_credit_input').value = credit ? credit : '';
