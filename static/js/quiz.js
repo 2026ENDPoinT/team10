@@ -1,3 +1,4 @@
+const quizText = value => typeof uiText === 'function' ? uiText(value) : value;
 /*quiz 기능 구현*/
 
 /* 학습 퀴즈 기능 */
@@ -183,23 +184,23 @@ async function startQuiz() {
 
     const subject = quizSubjectSelect.value;
     if (!subject) {
-        showMessage('과목을 선택해주세요.');
+        showMessage(quizText('과목을 선택해주세요.'));
         return;
     }
 
     const count = Number(quizCountSelect.value);
     if (!Number.isInteger(count) || count < MIN_COUNT || count > MAX_COUNT) {
-        showMessage('문제 수를 ' + MIN_COUNT + '~' + MAX_COUNT + ' 사이에서 선택해주세요.');
+        showMessage(quizText('문제 수를 ') + MIN_COUNT + '~' + MAX_COUNT + quizText(' 사이에서 선택해주세요.'));
         return;
     }
 
 
     if (document.getElementById('quiz-source')?.value === 'ai') {
-        if (count > 5) { showMessage('AI 퀴즈는 1~5문제를 선택해 주세요.'); return; }
+        if (count > 5) { showMessage(quizText('AI 퀴즈는 1~5문제를 선택해 주세요.')); return; }
         quizBusy = true;
         quizStartBtn.disabled = true;
         const status = document.getElementById('quiz-generation-status');
-        status.textContent = '문제와 해설을 생성하고 있습니다. 잠시 기다려 주세요…';
+        status.textContent = quizText('문제와 해설을 생성하고 있습니다. 잠시 기다려 주세요…');
         try {
             const data = await quizRequest('/ai/api/quiz/generate', {
                 subject, count, topic: document.getElementById('quiz-topic').value.trim()
@@ -208,11 +209,11 @@ async function startQuiz() {
             quizQuestions = data.questions;
             userAnswers = new Array(quizQuestions.length).fill(null);
             currentIndex = 0;
-            quizSubjectLabel.textContent = '- ' + subject + ' · AI 생성';
-            status.textContent = data.usage?.total_tokens ? '이번 생성 사용량: ' + data.usage.total_tokens + '토큰' : '생성 완료';
+            quizSubjectLabel.textContent = '- ' + subject + quizText(' · AI 생성');
+            status.textContent = data.usage?.total_tokens ? quizText('이번 생성 사용량: ') + data.usage.total_tokens + quizText('토큰') : quizText('생성 완료');
             renderQuestion();
             showSection('play');
-        } catch (error) { showMessage(error.message); status.textContent = '생성하지 못했습니다. 설정을 확인하고 다시 시도하세요.'; }
+        } catch (error) { showMessage(error.message); status.textContent = quizText('생성하지 못했습니다. 설정을 확인하고 다시 시도하세요.'); }
         finally { quizBusy = false; quizStartBtn.disabled = false; }
         return;
     }
@@ -239,7 +240,7 @@ function renderQuestion() {
     const q = quizQuestions[currentIndex];
     const total = quizQuestions.length;
 
-    quizProgressText.textContent = '문제 ' + (currentIndex + 1) + ' / ' + total;
+    quizProgressText.textContent = quizText('문제 ') + (currentIndex + 1) + ' / ' + total;
     quizProgressFill.style.width = ((currentIndex + 1) / total * 100) + '%';
     quizQuestion.textContent = 'Q' + (currentIndex + 1) + '. ' + q.question;
 
@@ -249,9 +250,9 @@ function renderQuestion() {
         label.querySelector('input').checked = (userAnswers[currentIndex] === i);
     });
 
-    // 첫 문제에서는 '이전' 숨김, 마지막 문제에서는 '다음' → '결과 보기'
+    // 첫 문제에서는 quizText('이전') 숨김, 마지막 문제에서는 quizText('다음') → quizText('결과 보기')
     quizPrevBtn.style.visibility = (currentIndex === 0) ? 'hidden' : 'visible';
-    quizNextBtn.textContent = (currentIndex === total - 1) ? '결과 보기' : '다음';
+    quizNextBtn.textContent = (currentIndex === total - 1) ? quizText('결과 보기') : quizText('다음');
 }
 
 // 보기 선택 / 해제: 이미 선택된 보기를 다시 누르면 선택 해제
@@ -335,18 +336,18 @@ function buildReviewItem(index) {
     item.appendChild(head);
 
     // 내 답 / 정답
-    const myText = (mine === null) ? '선택 안 함' : CHOICE_MARKS[mine] + ' ' + q.choices[mine];
+    const myText = (mine === null) ? quizText('선택 안 함') : CHOICE_MARKS[mine] + ' ' + q.choices[mine];
     const answerText = CHOICE_MARKS[q.answer] + ' ' + q.choices[q.answer];
 
-    item.appendChild(createReviewLine('내 답:', myText));
+    item.appendChild(createReviewLine(quizText('내 답:'), myText));
 
     if (!isCorrect || generatedQuizId) {
-        item.appendChild(createReviewLine('정답:', answerText));
+        item.appendChild(createReviewLine(quizText('정답:'), answerText));
 
         // 틀린 문제에만 해설 표시
         const explain = document.createElement('div');
         explain.className = 'quiz-review-explain';
-        explain.textContent = '💡 해설: ' + q.explanation;
+        explain.textContent = quizText('💡 해설: ') + q.explanation;
         item.appendChild(explain);
     }
 
@@ -354,7 +355,7 @@ function buildReviewItem(index) {
     const helpButton = document.createElement('button');
     helpButton.type = 'button';
     helpButton.className = 'btn-primary';
-    helpButton.textContent = 'AI에게 이 문제 질문하기';
+    helpButton.textContent = quizText('AI에게 이 문제 질문하기');
     helpButton.addEventListener('click', function () {
         try {
             const context = StudyQuizBridge.buildContext(
@@ -412,7 +413,7 @@ document.getElementById('quiz-ai-review-btn').addEventListener('click', function
             quizSubjectSelect.value, quizQuestions, userAnswers
         );
         if (!StudyQuizBridge.openTutor(context)) {
-            showMessage('모두 정답입니다! 개별 문제의 AI 질문 버튼을 이용해 보세요.');
+            showMessage(quizText('모두 정답입니다! 개별 문제의 AI 질문 버튼을 이용해 보세요.'));
         }
     } catch (error) {
         showMessage(error.message);
@@ -432,8 +433,8 @@ document.getElementById('quiz-ai-analysis-btn').addEventListener('click', functi
 async function quizRequest(url, payload) {
     const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
     let data;
-    try { data = await response.json(); } catch (_) { throw new Error('서버 응답을 확인해 주세요.'); }
-    if (!response.ok) throw new Error(data.error || '요청에 실패했습니다.');
+    try { data = await response.json(); } catch (_) { throw new Error(quizText('서버 응답을 확인해 주세요.')); }
+    if (!response.ok) throw new Error(data.error || quizText('요청에 실패했습니다.'));
     return data;
 }
 

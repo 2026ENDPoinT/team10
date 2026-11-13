@@ -13,11 +13,13 @@ from gpa_calculator import GRADE_POINTS, calculate_gpa
 from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
 from assignments import init_assignments
+from localization import init_localization
 
 
 load_dotenv(Path(__file__).with_name('.env'), override=True)
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 128 * 1024
+init_localization(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
 
 

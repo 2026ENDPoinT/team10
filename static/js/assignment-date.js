@@ -9,7 +9,7 @@ document.querySelectorAll('.deadline-picker').forEach(picker => {
             ? new Date(Number(year.value), Number(month.value), 0).getDate() : 31;
         day.replaceChildren(new Option('DD', ''));
         for (let value = 1; value <= count; value++) {
-            day.add(new Option(value + '일', String(value)));
+            day.add(new Option(value + (window.UI_LANGUAGE === 'en' ? '' : '일'), String(value)));
         }
         day.value = selected && Number(selected) <= count ? selected : '';
     }

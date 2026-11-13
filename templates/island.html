@@ -9,40 +9,42 @@
            href="{{ url_for('study_ai.index') }}">🤖 AI</a>
 
         <a class="island-btn {% if active_page == 'scores' %}active{% endif %}"
-           href="{{ url_for('scores') }}">📊 성적</a>
+           href="{{ url_for('scores') }}">{{ t('📊 성적') }}</a>
 
         <a class="island-btn {% if active_page == 'manage' %}active{% endif %}"
-           href="{{ url_for('manage') }}">⚙️ 관리</a>
+           href="{{ url_for('manage') }}">{{ t('⚙️ 관리') }}</a>
 
         <a class="island-btn {% if active_page == 'predict' %}active{% endif %}"
-           href="{{ url_for('predict') }}">🎯 예측</a>
+           href="{{ url_for('predict') }}">{{ t('🎯 예측') }}</a>
 
-        <a class="island-btn {% if active_page == 'assignments' %}active{% endif %}" href="{{ url_for('assignments.index') }}">📅 과제</a>
+        <a class="island-btn {% if active_page == 'assignments' %}active{% endif %}" href="{{ url_for('assignments.index') }}">{{ t('📅 과제') }}</a>
         <span class="island-divider"></span>
 
-        <div class="island-profile" title="현재 로그인한 학적 정보">
+        <div class="island-profile" title="{{ t('현재 로그인한 학적 정보') }}">
             <span class="island-avatar">{{ name[:1] }}</span>
-            <span class="island-profile-text">{{ year }}학년 · {{ student_id }} · {{ name }}</span>
+            <span class="island-profile-text">{{ year }}{{ t('학년 ·') }} {{ student_id }} · {{ name }}</span>
         </div>
 
-        <button type="button" id="openPasswordModal" class="island-btn" style="background: #ffc107; border: none; cursor: pointer; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 13px;" title="비밀번호 변경">🔑 비번변경</button>
+        <button type="button" id="openPasswordModal" class="island-btn" style="background: #ffc107; border: none; cursor: pointer; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 13px;" title="{{ t('비밀번호 변경') }}">{{ t('🔑 비번변경') }}</button>
 
-        <a class="island-home" href="{{ url_for('index') }}" title="처음 화면으로">🏠</a>
+        {% include '_language_button.html' %}
+
+        <a class="island-home" href="{{ url_for('index') }}" title="{{ t('처음 화면으로') }}">🏠</a>
     </nav>
 </div>
 
 <!-- 비밀번호 변경 모달 팝업 -->
 <div id="passwordModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
     <div style="background: white; padding: 25px; border-radius: 8px; width: 320px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
-        <h3 style="margin-top: 0; margin-bottom: 15px; color: #333;">🔐 비밀번호 변경</h3>
+        <h3 style="margin-top: 0; margin-bottom: 15px; color: #333;">{{ t('🔐 비밀번호 변경') }}</h3>
         <form action="{{ url_for('change_password') }}" method="POST">
             <div style="margin-bottom: 15px;">
-                <label style="display: block; font-size: 13px; margin-bottom: 5px; font-weight: bold;">새 비밀번호</label>
-                <input type="password" name="new_password" placeholder="특수문자(!@#$%^&*) 포함" required style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+                <label style="display: block; font-size: 13px; margin-bottom: 5px; font-weight: bold;">{{ t('새 비밀번호') }}</label>
+                <input type="password" name="new_password" placeholder="{{ t('특수문자(!@#$%^&*) 포함') }}" required style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" id="closePasswordModal" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">취소</button>
-                <button type="submit" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">변경하기</button>
+                <button type="button" id="closePasswordModal" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">{{ t('취소') }}</button>
+                <button type="submit" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">{{ t('변경하기') }}</button>
             </div>
         </form>
     </div>

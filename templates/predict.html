@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ ui_language }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>대학생 성적 관리 프로그램 - 성적 예측</title>
+    <title>{{ t('대학생 성적 관리 프로그램 - 성적 예측') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% include '_language_assets.html' %}
 </head>
 <body class="modern">
     {% set active_page = 'predict' %}
@@ -12,32 +13,32 @@
 
     <div class="container">
         <header class="page-title">
-            <span class="page-sub">{{ year }}학년 · 학번: {{ student_id }} · {{ name }}님 환영합니다!</span>
-            <h1>🎯 기말고사 성적 예측 및 목표 석차 계산</h1>
+            <span class="page-sub">{{ year }}{{ t('학년 · 학번:') }} {{ student_id }} · {{ name }}{{ t('님 환영합니다!') }}</span>
+            <h1>{{ t('🎯 기말고사 성적 예측 및 목표 석차 계산') }}</h1>
         </header>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flash-messages">
                     {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
+                        <li class="{{ category }}">{{ message|ui_text }}</li>
                     {% endfor %}
                 </ul>
             {% endif %}
         {% endwith %}
 
         <div class="form-card" style="background: #ffffff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <h2>📝 성적 예측 조건 입력</h2>
+            <h2>{{ t('📝 성적 예측 조건 입력') }}</h2>
             <form method="POST" action="{{ url_for('predict') }}">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">수강 인원 (명)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('수강 인원 (명)') }}</label>
                         <input type="number" name="total_students" value="40" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">목표 등급</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('목표 등급') }}</label>
                         <select name="target_grade" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="" disabled>목표 등급 선택</option>
+                            <option value="" disabled>{{ t('목표 등급 선택') }}</option>
                             <option value="A+" selected>A+</option>
                             <option value="A0">A0</option>
                             <option value="B+">B+</option>
@@ -50,82 +51,82 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">내 중간고사 점수</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('내 중간고사 점수') }}</label>
                         <input type="number" step="0.1" name="my_mid" value="85.5" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 평균</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('중간고사 평균') }}</label>
                         <input type="number" step="0.1" name="mid_mean" value="75.5" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 표준편차</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('중간고사 표준편차') }}</label>
                         <input type="number" step="0.1" name="mid_std" value="10.5" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <div style="flex: 1;">
-                            <label style="display:block; font-weight:bold; margin-bottom:5px;">중간 반영(%)</label>
+                            <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('중간 반영(%)') }}</label>
                             <input type="number" name="mid_weight" value="40" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                         </div>
                         <div style="flex: 1;">
-                            <label style="display:block; font-weight:bold; margin-bottom:5px;">기말 반영(%)</label>
+                            <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('기말 반영(%)') }}</label>
                             <input type="number" name="final_weight" value="40" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                         </div>
                     </div>
                 </div>
 
-                <h4 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">📊 상대평가 세부 등급별 비율 설정 (%)</h4>
+                <h4 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">{{ t('📊 상대평가 세부 등급별 비율 설정 (%)') }}</h4>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">A+ 비율 (%)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('A+ 비율 (%)') }}</label>
                         <input type="number" step="0.1" name="r_aplus" value="10" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">A0 비율 (%)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('A0 비율 (%)') }}</label>
                         <input type="number" step="0.1" name="r_azero" value="20" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">B+ 비율 (%)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('B+ 비율 (%)') }}</label>
                         <input type="number" step="0.1" name="r_bplus" value="20" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">B0 비율 (%)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('B0 비율 (%)') }}</label>
                         <input type="number" step="0.1" name="r_bzero" value="20" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">C+ 비율 (%)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('C+ 비율 (%)') }}</label>
                         <input type="number" step="0.1" name="r_cplus" value="15" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">C0 비율 (%)</label>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">{{ t('C0 비율 (%)') }}</label>
                         <input type="number" step="0.1" name="r_czero" value="15" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                 </div>
 
                 <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer; font-weight:bold;">
-                    🚀 기말고사 목표 석차 계산하기
+                    {{ t('🚀 기말고사 목표 석차 계산하기') }}
                 </button>
             </form>
         </div>
 
         {% if result %}
         <div class="result-card" style="margin-top: 25px; background: #e8f4fd; border: 1px solid #b8daff; padding: 20px; border-radius: 8px;">
-            <h3>📊 기말고사 단독 목표 성적 및 석차 계산 결과</h3>
+            <h3>{{ t('📊 기말고사 단독 목표 성적 및 석차 계산 결과') }}</h3>
             <p style="font-size: 16px; margin-top: 10px;">
-                입력하신 <strong>중간고사 점수와 반영 비율</strong>을 바탕으로, 최종 목표 등급인 <strong>{{ result.target_grade }}</strong> (상위 <strong>{{ result.target_pct }}%</strong> 이내)를 달성하기 위해 <strong>오직 기말고사 시험 자체</strong>에서 기록해야 하는 성적은 다음과 같습니다:
+                {{ t('입력하신') }} <strong>{{ t('중간고사 점수와 반영 비율') }}</strong>{{ t('을 바탕으로, 최종 목표 등급인') }} <strong>{{ result.target_grade }}</strong> {{ t('(상위') }} <strong>{{ result.target_pct }}%</strong> {{ t('이내)를 달성하기 위해') }} <strong>{{ t('오직 기말고사 시험 자체') }}</strong>{{ t('에서 기록해야 하는 성적은 다음과 같습니다:') }}
             </p>
             <div style="margin-top: 15px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #cce5ff;">
                 <p style="font-size: 18px; margin-bottom: 10px;">
-                    🎯 <strong>기말고사 단독 최소 석차:</strong> <span style="color: #dc3545; font-size: 24px; font-weight: bold;">상위 {{ result.required_final_ratio }}% 이내 ({{ result.required_final_rank }}등 / 총 {{ result.total_students }}명)</span>
+                    🎯 <strong>{{ t('기말고사 단독 최소 석차:') }}</strong> <span style="color: #dc3545; font-size: 24px; font-weight: bold;">{{ t('상위') }} {{ result.required_final_ratio }}{{ t('% 이내 (') }}{{ result.required_final_rank }}{{ t('등 / 총') }} {{ result.total_students }}{{ t('명)') }}</span>
                 </p>
                 <p style="font-size: 18px;">
-                    📈 <strong>기말고사 단독 최소 점수:</strong> <span style="color: #0056b3; font-size: 24px; font-weight: bold;">약 {{ result.required_final_score }}점 이상</span> <span style="font-size: 14px; color: #666;">(평균 및 표준편차 기준)</span>
+                    📈 <strong>{{ t('기말고사 단독 최소 점수:') }}</strong> <span style="color: #0056b3; font-size: 24px; font-weight: bold;">{{ t('약') }} {{ result.required_final_score }}{{ t('점 이상') }}</span> <span style="font-size: 14px; color: #666;">{{ t('(평균 및 표준편차 기준)') }}</span>
                 </p>
             </div>
             <p style="font-size: 13px; color: #666; margin-top: 10px;">
-                💡 중간고사에서 얻은 점수를 제외하고, 목표 총점에 도달하기 위해 <strong>기말고사 단독으로 받아야 하는 등수와 점수</strong>를 역산한 결과입니다.
+                {{ t('💡 중간고사에서 얻은 점수를 제외하고, 목표 총점에 도달하기 위해') }} <strong>{{ t('기말고사 단독으로 받아야 하는 등수와 점수') }}</strong>{{ t('를 역산한 결과입니다.') }}
             </p>
         </div>
         {% endif %}
