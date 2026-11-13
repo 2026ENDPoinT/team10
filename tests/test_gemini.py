@@ -56,3 +56,10 @@ class GeminiTests(unittest.TestCase):
     def test_timeout(self):
         with patch('study_ai.gemini.httpx.post', side_effect=httpx.ReadTimeout('private detail')):
             self.assertEqual(self.client.post('/ai/api/chat', json={'message': '안녕'}).status_code, 504)
+
+    def test_free_tier_ineligible_project(self):
+        with patch('study_ai.gemini.httpx.post', return_value=self.reply({'error': {
+            'message': 'The Gemini API free tier is not available for this project.'}}, 403)):
+            result = self.client.post('/ai/api/chat', json={'message': '안녕'})
+        self.assertEqual(result.status_code, 503)
+        self.assertIn('무료 API를 사용할 수 없습니다', result.json['error'])

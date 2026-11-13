@@ -32,6 +32,16 @@ def answer_gemini(payload, config):
                               headers={'x-goog-api-key': key}, json=body, timeout=45.0)
         if response.status_code == 429:
             raise TutorError('Gemini 사용 한도에 도달했습니다. 잠시 후 다시 시도하거나 AI Studio에서 할당량을 확인해 주세요.', 429)
+        if response.status_code == 403:
+            # Classify only; never expose the provider's raw message or credentials.
+            try:
+                provider_message = str(response.json().get('error', {}).get('message', '')).lower()
+            except (ValueError, AttributeError):
+                provider_message = ''
+            if 'free tier is not available' in provider_message or 'free tier unavailable' in provider_message:
+                raise TutorError('이 Google 프로젝트는 Gemini 무료 API를 사용할 수 없습니다. AI Studio에서 프로젝트의 무료 등급 자격을 확인해 주세요. 앱에서 결제를 자동으로 활성화하지 않습니다.', 503)
+            if 'verification' in provider_message:
+                raise TutorError('Google 프로젝트 또는 계정 인증이 필요합니다. AI Studio의 인증 안내를 확인해 주세요.', 503)
         if response.status_code in (400, 401, 403):
             raise TutorError('Gemini API 키, 프로젝트 권한 또는 요청 설정을 확인해 주세요.', 503)
         if response.status_code == 404:
