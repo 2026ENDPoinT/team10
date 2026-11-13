@@ -1,3 +1,4 @@
+
 {#
   학습 퀴즈 페이지
   - 상단 아일랜드(_island.html)와 카드 디자인을 성적 화면(scores.html)과 동일하게 맞춤
@@ -5,6 +6,7 @@
   - 디자인 참고 이미지: 스크린샷_2026-11-13_180001.png ~ 180041.png
   - 추가로 사용한 이미지 없음
 #}
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -12,16 +14,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>대학생 성적 관리 프로그램 - 학습 퀴즈</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body class="modern">
-    {% set active_page = 'quiz' %}
-    {% include 'island.html' %}
 
+    <style>
+        /* 결과 화면: 문제별 리뷰 카드 (O / X 구분) */
+        .quiz-review-item {
+            padding: 14px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            border-left-width: 6px;
+            background: #ffffff;
+            text-align: left;
+        }
+        .quiz-review-item.correct { border-left-color: #28a745; background: #f3fbf5; }
+        .quiz-review-item.wrong   { border-left-color: #dc3545; background: #fdf3f4; }
+
+        .quiz-review-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .quiz-mark {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; border-radius: 50%;
+            color: #fff; font-weight: bold; font-size: 18px; flex-shrink: 0;
+        }
+        .quiz-review-item.correct .quiz-mark { background: #28a745; }
+        .quiz-review-item.wrong   .quiz-mark { background: #dc3545; }
+
+        .quiz-review-line { margin: 4px 0; }
+        .quiz-review-explain {
+            margin-top: 8px; padding: 10px; border-radius: 4px;
+            background: #fff3cd; color: #664d03;
+        }
+    </style>
+</head>
+<body>
     <div class="container">
-        <header class="page-title">
-            <span class="page-sub">{{ year }}학년 · {{ name }}님 환영합니다!</span>
-            <h1>학습 퀴즈</h1>
-        </header>
+        <div class="header-info">
+            <h1>🧠 학습 퀴즈</h1>
+            <p><strong>{{ year }}학년</strong> | 학번: <strong>{{ student_id }}</strong> | 이름: <strong>{{ name }}</strong>님 환영합니다!</p>
+            <a href="{{ url_for('scores', student_id=student_id, name=name, year=year) }}" class="btn-back-main">성적 화면으로</a>
+        </div>
+
 
         <!-- 플래시 메시지 (서버 알림) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -40,75 +71,99 @@
         <!-- 화면 1: 퀴즈 설정 -->
         <div class="form-card" id="quiz-setup">
             <h2>⚙️ 퀴즈 설정</h2>
+
+            <p>AI 문제는 과목의 일반 학습 내용으로 생성됩니다. 실제 수업 범위와 다를 수 있고 정답에 오류가 있을 수 있습니다.</p>
+            <label for="quiz-source">문제 출처</label>
+            <select id="quiz-source"><option value="ai">AI 새 문제 (1~5문제)</option><option value="bank">기존 문제은행 (1~10문제)</option></select>
+            <label for="quiz-topic">학습 주제 (선택)</label>
+            <input id="quiz-topic" maxlength="200" placeholder="예: Python 반복문, 행렬 곱셈, SQL JOIN">
+            <p id="quiz-generation-status" role="status" aria-live="polite"></p>
             <div class="form-row">
-                <!-- 과목 선택칸: 학년별 과목 구성은 추후 구현 (현재는 선택칸만 있으며 퀴즈 시작에 사용하지 않음) -->
-<select id="quiz-subject">
-    <option value="" disabled selected>과목 선택</option>
-    {% for sem, courses in curriculum.items() %}
-        <optgroup label="{{ sem }}">
-            {% for c in courses %}
-                <option value="{{ c }}">{{ c }}</option>
-            {% endfor %}
-        </optgroup>
-    {% endfor %}
-</select>
-                <select id="quiz-count">
-                    <option value="" disabled selected>문제 수</option>
-                    <option value="5">5문제</option>
-                    <option value="10">10문제</option>
+                <!-- 과목 선택: 성적 등록 화면과 동일하게 학년/학기별 optgroup -->
+                <select id="quiz-subject">
+                    <option value="" disabled selected>과목 선택</option>
+                    {% for sem, courses in curriculum.items() %}
+                        <optgroup label="{{ sem }}">
+                            {% for c in courses %}
+                                <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    {% endfor %}
                 </select>
+
+                <!-- 문제 수: 1 ~ 10 -->
+                <select id="quiz-count">
+                    <option value="" disabled selected>문제 수 (1~10)</option>
+                    {% for n in range(1, 11) %}
+                        <option value="{{ n }}">{{ n }}문제</option>
+                    {% endfor %}
+                </select>
+
                 <button type="button" class="btn-primary" id="quiz-start-btn">퀴즈 시작</button>
             </div>
         </div>
 
         <!-- 화면 2: 문제 풀이 -->
         <div class="list-card" id="quiz-play" hidden>
-            <h2>📖 문제 풀이 <span id="quiz-subject-label"></span></h2>
+
+            <h2>📖 문제 풀이 <small id="quiz-subject-label" style="font-size:14px; color:#6c757d;"></small></h2>
             <p id="quiz-progress-text" style="font-weight:bold;">문제 1 / 5</p>
-            <div class="quiz-progress">
-                <div id="quiz-progress-fill" class="quiz-progress-fill"></div>
+            <div style="width:100%; height:8px; background-color:#f1f3f5; border:1px solid #dee2e6; border-radius:4px; overflow:hidden; margin-bottom:20px;">
+                <div id="quiz-progress-fill" style="width:0%; height:100%; background-color:#007bff;"></div>
+
             </div>
 
             <h3 id="quiz-question">문제가 여기에 표시됩니다.</h3>
 
             <!-- 4지선다: 보기 텍스트는 quiz.js에서 채움 / 선택한 보기를 다시 누르면 선택 해제 -->
-            <div id="quiz-choices" class="quiz-choices">
-                <label class="quiz-choice">
+
+            <div id="quiz-choices" style="margin-bottom:20px;">
+                <label style="display:block; padding:10px; margin-bottom:8px; background:#ffffff; border:1px solid #dee2e6; border-radius:4px; cursor:pointer;">
                     <input type="radio" name="quiz-choice" value="0"> <span>① 보기 1</span>
                 </label>
-                <label class="quiz-choice">
+                <label style="display:block; padding:10px; margin-bottom:8px; background:#ffffff; border:1px solid #dee2e6; border-radius:4px; cursor:pointer;">
                     <input type="radio" name="quiz-choice" value="1"> <span>② 보기 2</span>
                 </label>
-                <label class="quiz-choice">
+                <label style="display:block; padding:10px; margin-bottom:8px; background:#ffffff; border:1px solid #dee2e6; border-radius:4px; cursor:pointer;">
                     <input type="radio" name="quiz-choice" value="2"> <span>③ 보기 3</span>
                 </label>
-                <label class="quiz-choice">
+                <label style="display:block; padding:10px; margin-bottom:8px; background:#ffffff; border:1px solid #dee2e6; border-radius:4px; cursor:pointer;">
                     <input type="radio" name="quiz-choice" value="3"> <span>④ 보기 4</span>
                 </label>
             </div>
 
-            <div class="quiz-nav">
+
+            <div style="display:flex; justify-content:space-between;">
+
                 <button type="button" class="btn-back" id="quiz-prev-btn">이전</button>
                 <button type="button" class="btn-primary" id="quiz-next-btn">다음</button>
             </div>
         </div>
 
-        <!-- 화면 3: 결과 -->
+
+        <!-- 화면 3: 결과 (출제된 모든 문제를 O/X로 구분해서 표시) -->
         <div class="summary-card" id="quiz-result" hidden>
             <h2>🏁 퀴즈 결과</h2>
             <p><strong>맞힌 문제 수:</strong> <span id="quiz-result-score">0 / 0</span> 문제</p>
             <p><strong>정답률:</strong> <span id="quiz-result-detail">0</span> %</p>
 
-        <h3>📝 문제별 결과</h3>
+
+            <h3>📋 문제별 결과</h3>
             <div id="quiz-review-list"></div>
 
             <div style="margin-top:20px;">
-                <button type="button" class="btn-primary" id="quiz-retry-btn">다시 풀기</button>
+                <button type="button" class="btn-primary" id="quiz-retry-btn">같은 문제 다시 풀기</button>
+                <button type="button" class="btn-back" id="quiz-new-btn">다른 퀴즈 설정</button>
+                <button type="button" class="btn-primary" id="quiz-ai-review-btn">AI와 오답 복습하기</button>
+                <button type="button" class="btn-primary" id="quiz-ai-analysis-btn">AI와 강점·복습 영역 확인하기</button>
+
             </div>
         </div>
     </div>
 
+
+    <script src="{{ url_for('study_ai.static', filename='quiz-bridge.js') }}"></script>
     <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
 </body>
 </html>
