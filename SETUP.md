@@ -53,7 +53,7 @@ This is a local development copy, not a public deployment. Existing account/grad
 
 `SOURCE_SNAPSHOT.json` records hashes of the original files copied. `integration.patch` records the initial quiz/score UI changes and has ALREADY been applied to this copy. Do not apply it again here. Merge reviewed source changes on a team feature branch later; do not overwrite your team's database, `.env`, `.venv`, or Git history.
 
-Groq requests go to Groq, even though the model name starts with `openai/`. No OpenAI key is needed for this mode. Free account limits still apply; a limit error asks you to wait and never switches to a paid provider. Gemini remains available with `AI_MODE=gemini`.
+Groq requests go to Groq, even though the model name starts with `openai/`. No OpenAI key is needed for this mode. Free account limits still apply; a limit error asks you to wait and never switches to a paid provider. Other supported modes are `AI_MODE=openai` (needs `OPENAI_API_KEY`) and `AI_MODE=demo` (no AI request).
 
 
 ## AI 퀴즈 생성

@@ -19,8 +19,6 @@ def init_study_ai(app):
     app.config.setdefault('OPENAI_API_KEY', os.getenv('OPENAI_API_KEY', ''))
     app.config.setdefault('OPENAI_MODEL', os.getenv('OPENAI_MODEL', 'gpt-5.4-mini'))
     app.config.setdefault('YOUTUBE_API_KEY', os.getenv('YOUTUBE_API_KEY', ''))
-    app.config.setdefault('GEMINI_API_KEY', os.getenv('GEMINI_API_KEY', ''))
-    app.config.setdefault('GEMINI_MODEL', os.getenv('GEMINI_MODEL', 'gemini-3.5-flash-lite'))
     app.register_blueprint(bp)
 
 
@@ -35,16 +33,16 @@ def index():
             abort(400)
         assignment_plan = planning_context(assignment_id)
     mode = current_app.config['AI_MODE']
-    key_name = {'groq': 'GROQ_API_KEY', 'gemini': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
+    key_name = {'groq': 'GROQ_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
     return render_template('study_ai/chat.html', mode=mode, key_name=key_name, assignment_plan=assignment_plan,
-                           provider_name={'groq': 'Groq', 'gemini': 'Google Gemini', 'openai': 'OpenAI'}.get(mode, mode),
+                           provider_name={'groq': 'Groq', 'openai': 'OpenAI'}.get(mode, mode),
                            configured=bool(current_app.config.get(key_name)))
 
 
 @bp.get('/api/health')
 def health():
     mode = current_app.config['AI_MODE']
-    key_name = {'groq': 'GROQ_API_KEY', 'gemini': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
+    key_name = {'groq': 'GROQ_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
     ready = mode == 'demo' or bool(current_app.config.get(key_name))
     return jsonify(mode=mode, configured=ready)
 

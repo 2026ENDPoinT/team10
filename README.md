@@ -23,7 +23,7 @@ https://team10-2e07.onrender.com
 
 - **다이나믹 아일랜드:** 화면 위에 고정된 메뉴입니다. 이름 첫 글자 버튼에 마우스를 올리면 학년·학번·이름과 비밀번호 변경·로그아웃이 나옵니다.
 - **KOR / ENG 전환:** 선택한 언어는 쿠키에 저장됩니다. 번역은 `static/translations.json`에서 관리합니다.
-- **비밀번호 규칙:** 5~20자이며 특수문자(`!@#$%^&*`)를 1개 이상 포함해야 합니다. 로그인 칸과 비밀번호 변경 창에 조건이 표시됩니다. 규칙 도입 전에 만든 계정은 그대로 로그인할 수 있습니다.
+- **비밀번호 규칙:** 5~20자이며 특수문자(`!@#$%^&*`)를 1개 이상 포함해야 합니다. 로그인 칸과 비밀번호 변경 창에 조건이 표시됩니다. 규칙은 새 계정을 만들 때와 비밀번호를 바꿀 때 검사합니다.
 
 ---
 
@@ -34,12 +34,11 @@ https://team10-2e07.onrender.com
 ```powershell
 py -3.15 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-lock.txt
-.\.venv\Scripts\python.exe -m pip install scipy
 ```
 
-> `scipy`는 예측 기능(`scipy.stats.norm`)에 필요하지만 아직 `requirements.txt`와 `requirements-lock.txt`에 들어 있지 않아 따로 설치해야 합니다.
+`requirements-lock.txt`는 로컬 개발용 고정 버전이며 예측 기능에 필요한 `scipy`가 들어 있습니다. 배포용 `gunicorn`, `psycopg`는 `requirements.txt`에만 있으므로 로컬에서 PostgreSQL로 실행하려면 `pip install -r requirements.txt`를 추가로 실행합니다.
 
-`START_APP.cmd`를 더블클릭해도 됩니다. `.venv`가 없으면 만들고 `requirements-lock.txt`를 설치합니다. 이때도 `scipy`는 위 명령으로 따로 설치해야 합니다.
+`START_APP.cmd`를 더블클릭해도 됩니다. `.venv`가 없으면 만들고 `requirements-lock.txt`를 설치하며, `.env`가 없으면 `.env.example`을 복사합니다.
 
 ### 2. `.env` 설정
 
@@ -47,11 +46,14 @@ py -3.15 -m venv .venv
 
 | 변수 | 설명 |
 |---|---|
-| `AI_MODE` | `groq`(기본), `gemini`, `openai`, `demo` 중 하나. AI 퀴즈 생성은 `groq`에서만 동작합니다. |
+| `AI_MODE` | `groq`(기본), `openai`, `demo` 중 하나. AI 퀴즈 생성은 `groq`에서만 동작합니다. `demo`는 실제 AI 요청 없이 고정된 예시 답변만 돌려줍니다. |
 | `GROQ_API_KEY` / `GROQ_MODEL` | Groq 키와 모델(기본 `openai/gpt-oss-120b`). 모델 이름에 `openai/`가 있어도 Groq 키를 사용합니다. |
-| `GEMINI_API_KEY`, `OPENAI_API_KEY` | 다른 AI 모드를 사용할 때만 필요합니다. |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | `AI_MODE=openai`일 때만 필요합니다(기본 모델 `gpt-5.4-mini`). |
 | `YOUTUBE_API_KEY` | 선택 사항. 있으면 추천 강의 카드를, 없으면 YouTube 검색 링크를 보여 줍니다. |
+| `PORT` | 로컬 실행 포트(기본 `5002`). `python app.py`로 실행할 때만 쓰입니다. |
 | `FLASK_SECRET_KEY` | 긴 임의 문자열. 비워 두면 서버를 재시작할 때마다 다시 로그인해야 합니다. |
+| `DATABASE_URL` | 선택 사항. 비워 두면 `data/database.db` SQLite 파일을 사용합니다. PostgreSQL 주소를 넣으면 그 데이터베이스를 씁니다. |
+| `PASSWORD_PEPPER` | 로컬 SQLite에서는 선택 사항(비우면 개발용 기본값 사용). `DATABASE_URL`을 쓸 때는 필수입니다. |
 
 Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고하세요.
 
@@ -61,9 +63,19 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 .\.venv\Scripts\python.exe app.py
 ```
 
-브라우저에서 **http://127.0.0.1:5000** 을 엽니다. 서버가 실행되는 동안 터미널을 열어 둡니다.
+브라우저에서 **http://127.0.0.1:5002** 를 엽니다. 서버가 실행되는 동안 터미널을 열어 둡니다.
 
-> `app.py`는 `app.run(debug=True)`로 실행되므로 기본 포트는 **5000**입니다. `.env`의 `PORT` 값과 `START_APP.cmd`, `SETUP.md`에 적힌 5002는 현재 코드에 반영되어 있지 않습니다.
+> 포트는 `.env`의 `PORT` 값을 따르며, 없으면 **5002**를 씁니다. `PORT`를 바꿨다면 브라우저 주소의 포트도 같이 바꿉니다.
+
+### 4. 테스트
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+node tests/test_assignment_countdown.cjs
+node tests/test_quiz_integration.cjs
+```
+
+Python 테스트는 임시 SQLite에서 실행됩니다. PostgreSQL로 확인하려면 `TEST_DATABASE_URL`을 지정합니다(아래 "로컬 개발과 테스트" 참고).
 
 ---
 
@@ -95,16 +107,16 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 - 테이블은 앱이 시작할 때 자동으로 만들어집니다(`database.py`의 `init_db()`). SQL을 따로 실행할 필요가 없습니다.
 - 계정과 데이터 접근 규칙
   - **학번 + 비밀번호 조합마다 별도의 계정(성적 셋)입니다.** 예: 학번 22222222에 비밀번호 `!!!!!`와 `@@@@@`는 서로 다른 계정입니다. 처음 쓰는 조합으로 로그인하면 새 계정이 만들어집니다(이때 비밀번호 규칙을 검사합니다).
-  - 비밀번호는 평문으로 저장하지 않습니다. `scrypt(비밀번호, salt = PASSWORD_PEPPER + 학번)`으로 만든 키(`password_key`)만 저장하며, 같은 조합이면 항상 같은 키가 나와서 계정을 찾을 수 있습니다. 세션 쿠키에는 비밀번호를 넣지 않습니다(세션에는 `user_id`만).
+  - 비밀번호는 평문으로 저장하지 않습니다. `scrypt(비밀번호, salt = "PASSWORD_PEPPER:학번")`으로 만든 키(`password_key`)만 저장하며, 같은 조합이면 항상 같은 키가 나와서 계정을 찾을 수 있습니다. 세션 쿠키에는 비밀번호를 넣지 않습니다(세션에는 `user_id`만).
   - 성적·오답·대화·과제는 로그인한 계정(`user_id`)의 자료만 조회하고 수정할 수 있습니다. 비밀번호를 바꿔도 자료는 그대로 유지되며, 같은 학번의 다른 계정이 쓰는 비밀번호로는 바꿀 수 없습니다.
-  - 예전 계정 구조의 테이블은 시작할 때 지우지 않고 `legacy_*` 이름으로 보관합니다.
+  - 예전 계정 구조(평문 비밀번호 또는 학번당 계정 하나)의 테이블은 시작할 때 지우지 않고 `legacy_<테이블>_<시각>` 이름으로 보관한 뒤 새 구조로 다시 만듭니다. 보관된 예전 계정으로는 로그인할 수 없으므로 다시 가입해야 합니다.
 
 ### 로컬 개발과 테스트
 
 모든 데이터 접근은 `database.py` 한 곳에서 합니다. SQL은 `?` 자리표시자로 작성하며, PostgreSQL에서는 자동으로 `%s`로 바뀝니다.
 
 - `DATABASE_URL`이 **없으면** `data/database.db` SQLite 파일을 씁니다. 노트북에서는 지금처럼 설치 없이 실행됩니다. `data/`는 `.gitignore`에 있어 커밋되지 않습니다.
-- 예전 구조(평문 비밀번호)의 로컬 SQLite 테이블은 지우지 않고 `legacy_*` 이름으로 보관합니다.
+- 로컬 SQLite에서 `PASSWORD_PEPPER`가 없으면 개발용 고정값을 씁니다. 나중에 값을 정하면 기존 로컬 계정의 키가 달라져 로그인할 수 없으니 처음부터 정해 두는 것이 좋습니다.
 - 테스트는 임시 SQLite로 돌고, `TEST_DATABASE_URL`을 주면 그 PostgreSQL로 돕니다. 테이블을 비우므로 운영 DB 주소를 넣으면 안 됩니다.
 
 ### 무료 Postgres 주의 사항
@@ -145,6 +157,7 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 | 변수 | 값 |
 |---|---|
 | `DATABASE_URL` | 1단계에서 복사한 Internal Database URL |
+| `PORT` | 로컬 실행 포트(기본 `5002`). `python app.py`로 실행할 때만 쓰입니다. |
 | `FLASK_SECRET_KEY` | **필수.** 긴 임의 문자열. 비워 두면 재시작·휴면 때마다 모두 로그아웃되고, gunicorn 작업 프로세스마다 키가 달라져 로그인이 풀릴 수 있습니다. |
 | `PASSWORD_PEPPER` | **필수(`DATABASE_URL`을 쓸 때).** 긴 임의 문자열. 비밀번호 키를 만들 때 쓰며, 없으면 서버가 시작되지 않습니다. **한 번 정한 뒤 바꾸면 모든 계정에 로그인할 수 없으니 절대 바꾸지 마세요.** 로컬 SQLite에서는 없어도 됩니다. |
 | `AI_MODE`, `GROQ_API_KEY`, `GROQ_MODEL` | AI 기능 설정 (위 `.env` 설정 표와 같음) |
@@ -173,16 +186,16 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 
 ```
 team10/
-├── app.py                  # Flask 앱: 로그인, 성적·관리·예측·퀴즈 라우트, 비밀번호 규칙, 교과과정(CURRICULUM)
-├── database.py             # 계정·과목·오답 노트·AI 대화 저장 (현재 SQLite → Render Postgres 전환 대상)
+├── app.py                  # Flask 앱: 로그인, 성적·관리·예측·퀴즈 라우트, 비밀번호 규칙, 교과과정(CURRICULUM), ProxyFix
+├── database.py             # 모든 데이터 접근: DATABASE_URL이 있으면 PostgreSQL, 없으면 SQLite. 계정 키(scrypt)·테이블 생성
 ├── gpa_calculator.py       # 등급별 평점(GRADE_POINTS)과 전체·학기별 평점 계산
 ├── assignments.py          # 과제 관리 블루프린트 (/assignments/)
 ├── study_records.py        # 오답 노트·AI 대화 저장 API (/api/...)
 ├── localization.py         # 한국어/영어 번역 (t(), ui_text 필터)
 ├── study_ai/               # AI 학습 파트너 모듈 (/ai/)
 │   ├── __init__.py         #   채팅 화면·채팅 API 등록
-│   ├── service.py          #   AI 요청 구성 (Groq / Gemini / OpenAI / demo)
-│   ├── groq.py, gemini.py  #   제공자별 API 호출
+│   ├── service.py          #   AI 요청 구성 (Groq / OpenAI / demo)
+│   ├── groq.py             #   Groq API 호출 (OpenAI 모드는 service.py에서 직접 호출)
 │   ├── generated_quiz.py   #   AI 퀴즈 생성·채점, 오답 자동 저장
 │   ├── resources.py        #   YouTube 추천 강의 검색
 │   ├── validation.py       #   요청 데이터 검증
@@ -197,8 +210,8 @@ team10/
 │   ├── css/style.css       # 공통 디자인 시스템
 │   ├── js/                 # main.js(그래프), quiz.js, language.js, assignment-*.js
 │   └── translations.json   # 한국어 → 영어 번역표
-├── tests/                  # unittest(Python) + Node 테스트
-├── requirements.txt        # Render 빌드에 사용 (gunicorn, psycopg, scipy 추가 필요)
+├── tests/                  # unittest(Python) + Node 테스트, db_helper.py(테스트용 DB 설정)
+├── requirements.txt        # Render 빌드에 사용 (Flask, openai, scipy, psycopg, gunicorn 등)
 ├── requirements-lock.txt   # 로컬 개발용 고정 버전
 ├── .env.example            # 환경 변수 예시 (로컬은 .env, Render는 Environment 탭)
 ├── START_APP.cmd           # Windows 로컬 실행 스크립트
@@ -211,7 +224,8 @@ team10/
 
 | 방식 | 주소 | 설명 |
 |---|---|---|
-| POST | `/login`, `/logout`, `/change-password` | 로그인·로그아웃·비밀번호 변경 |
+| POST | `/login`, `/change-password` | 로그인(처음 쓰는 학번·비밀번호 조합이면 계정 생성)·비밀번호 변경 |
+| GET | `/logout` | 로그아웃 |
 | POST | `/add`, `/edit/<id>`, `/delete/<id>` | 과목 등록·수정·삭제 |
 | POST | `/ai/api/chat` | AI 학습 파트너 질문 |
 | POST | `/ai/api/quiz/generate`, `/ai/api/quiz/grade` | AI 퀴즈 생성(15초 간격 제한)·채점 |
@@ -227,7 +241,7 @@ JSON API는 같은 사이트에서 보낸 요청만 받습니다. 다른 Origin�
 
 - AI 퀴즈와 답변은 일반적인 과목 내용을 바탕으로 생성되므로 실제 수업 범위와 다르거나 틀릴 수 있습니다. AI는 성적 데이터를 수정하지 않습니다.
 - 오답 노트와 저장된 대화는 개수 제한(10개 / 3개)을 넘으면 가장 오래된 항목부터 자동으로 지워집니다.
-- **공개 주소 보안:** Render에 배포하면 누구나 접속할 수 있습니다. 로그인은 학번 + 비밀번호로 데이터를 구분하는 해커톤용 방식이고 비밀번호가 평문으로 저장되므로, 실제 개인정보나 실제 비밀번호를 입력하지 않도록 안내합니다.
+- **공개 주소 보안:** Render에 배포하면 누구나 접속할 수 있습니다. 로그인은 학번 + 비밀번호 조합으로 데이터를 구분하는 해커톤용 방식이며 본인 확인 절차가 없습니다. 비밀번호는 해시 키로만 저장되지만, 실제 개인정보나 실제 비밀번호를 입력하지 않도록 안내합니다.
 - **AI 사용량 공유:** Render에 등록한 Groq 키 하나를 모든 방문자가 함께 사용합니다. 무료 한도를 넘으면 모든 사용자의 AI 기능이 잠시 멈춥니다. AI 퀴즈의 15초 간격 제한은 브라우저 세션 단위로만 적용됩니다.
 - **무료 플랜 제약:** 휴면 후 첫 접속에 약 1분이 걸리고, 무료 Postgres는 30일 후 만료됩니다.
 

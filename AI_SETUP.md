@@ -1,6 +1,6 @@
 # 학습파트너 AI 설정 가이드 — VS Code / Windows
 
-현재 학습파트너는 **Groq API**와 **`openai/gpt-oss-120b` 모델**을 사용합니다. 모델 이름에 `openai/`가 있어도 **Groq에서 발급한 키**를 사용합니다. OpenAI 또는 Gemini 키는 필요하지 않습니다.
+현재 학습파트너는 **Groq API**와 **`openai/gpt-oss-120b` 모델**을 사용합니다. 모델 이름에 `openai/`가 있어도 **Groq에서 발급한 키**를 사용합니다. OpenAI 키는 필요하지 않습니다.
 
 ## 1. 프로젝트 폴더 열기
 
@@ -55,7 +55,7 @@ PORT=5002
 
 `여기에_본인의_Groq_API_키_입력`은 예시 문구입니다. 실제 발급된 키로 바꾼 뒤 `Ctrl+S`로 저장합니다.
 
-- `GEMINI_API_KEY`와 `OPENAI_API_KEY`는 비워 두어도 됩니다. Groq 모드에서는 사용하지 않습니다.
+- `OPENAI_API_KEY`는 비워 두어도 됩니다. Groq 모드에서는 사용하지 않습니다.
 - `YOUTUBE_API_KEY`는 선택 사항입니다. 없으면 주제에 맞는 YouTube 검색 링크를 제공합니다. 설정하면 영상 검색 결과 카드를 제공할 수 있습니다.
 - 이 로컬 앱은 `.env` 설정을 우선합니다. 수정 후에는 서버를 다시 실행해야 반영됩니다.
 - 실제 키는 `AI_SETUP_KO.md`, `.env.example`, Python/JavaScript 코드, 채팅 또는 GitHub에 넣지 않습니다.
@@ -97,7 +97,7 @@ PORT=5002
 
 ## 7. 자주 발생하는 문제
 
-### 여전히 Google Gemini라고 표시될 때
+### 여전히 이전 AI 제공자가 표시될 때
 
 1. 현재 실행 중인 서버 터미널에서 `Ctrl+C`로 종료합니다.
 2. 올바른 `team10-ai-branch` 폴더의 `.env`에 `AI_MODE=groq`가 있는지 확인합니다.
