@@ -26,6 +26,14 @@ def init_study_ai(app):
 
 @bp.get('/')
 def index():
+    assignment_plan = None
+    if request.args.get('assignment_id') is not None:
+        from assignments import planning_context
+        assignment_id = request.args.get('assignment_id', type=int)
+        if assignment_id is None:
+            from flask import abort
+            abort(400)
+        assignment_plan = planning_context(assignment_id)
     back_url = None
     endpoint = current_app.config.get('STUDY_BACK_ENDPOINT')
     navigation = session.get('study_navigation')
@@ -35,7 +43,7 @@ def index():
         back_url = url_for('index')
     mode = current_app.config['AI_MODE']
     key_name = {'groq': 'GROQ_API_KEY', 'gemini': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
-    return render_template('study_ai/chat.html', mode=mode, key_name=key_name,
+    return render_template('study_ai/chat.html', mode=mode, key_name=key_name, assignment_plan=assignment_plan,
                            provider_name={'groq': 'Groq', 'gemini': 'Google Gemini', 'openai': 'OpenAI'}.get(mode, mode),
                            configured=bool(current_app.config.get(key_name)), back_url=back_url)
 
