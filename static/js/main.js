@@ -1,3 +1,4 @@
+const chartText = value => typeof uiText === 'function' ? uiText(value) : value;
 /*화면의 JavaScript 기능*/
 /*화면의 JavaScript 기능*/
 
@@ -87,7 +88,7 @@ function drawGpaChart() {
         return data.length === 1 ? padL + plotW / 2 : xStart + (xEnd - xStart) * i / (data.length - 1);
     };
 
-    const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': '학기별 성적 추이 그래프' });
+    const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': chartText('학기별 성적 추이 그래프') });
 
     // 가로 눈금선 + 평점 눈금 숫자
     [0, 1, 2, 3, 4, 4.5].forEach(function (v) {
@@ -98,7 +99,7 @@ function drawGpaChart() {
     // 전체 평균 가로선 (수치에 맞는 높이)
     const avgY = yOf(overall);
     svg.appendChild(svgEl('line', { x1: padL, x2: W - padR, y1: avgY, y2: avgY, class: 'gc-avg-line' }));
-    svg.appendChild(svgEl('text', { x: W - padR - 4, y: avgY - 8, class: 'gc-avg-text', 'text-anchor': 'end' }, '평균 ' + overall.toFixed(2)));
+    svg.appendChild(svgEl('text', { x: W - padR - 4, y: avgY - 8, class: 'gc-avg-text', 'text-anchor': 'end' }, chartText('평균 ') + overall.toFixed(2)));
 
     // 학기별 평점 꺾은선
     if (data.length > 1) {
@@ -120,8 +121,8 @@ function drawGpaChart() {
         svg.appendChild(circle);
 
         svg.appendChild(svgEl('text', { x: x, y: y - 14, class: 'gc-value', 'text-anchor': 'middle' }, p.gpa.toFixed(2)));
-        svg.appendChild(svgEl('text', { x: x, y: H - padB + 22, class: 'gc-axis-text', 'text-anchor': 'middle', 'font-size': labelSize }, parsed.year ? parsed.year + '년' : ''));
-        svg.appendChild(svgEl('text', { x: x, y: H - padB + 22 + labelSize + 4, class: 'gc-axis-text', 'text-anchor': 'middle', 'font-size': labelSize }, parsed.term));
+        svg.appendChild(svgEl('text', { x: x, y: H - padB + 22, class: 'gc-axis-text', 'text-anchor': 'middle', 'font-size': labelSize }, parsed.year ? parsed.year + (window.UI_LANGUAGE === 'en' ? '' : '년') : ''));
+        svg.appendChild(svgEl('text', { x: x, y: H - padB + 22 + labelSize + 4, class: 'gc-axis-text', 'text-anchor': 'middle', 'font-size': labelSize }, chartText(parsed.term)));
     });
 
     chartBox.appendChild(svg);

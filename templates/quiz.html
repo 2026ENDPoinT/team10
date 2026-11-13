@@ -1,34 +1,36 @@
 {#
   학습 퀴즈 페이지
-  - 상단 아일랜드(_island.html)와 카드 디자인을 성적 화면(scores.html)과 동일하게 맞춤
   - quiz.js 가 사용하는 id / 구조(label > input + span)는 그대로 유지함
-  - 디자인 참고 이미지: 스크린샷_2026-11-13_180001.png ~ 180041.png
-  - 추가로 사용한 이미지 없음
+  - 결과 리뷰 카드 스타일(.quiz-review-*)은 static/css/style.css 로 이동
 #}
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ ui_language }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>대학생 성적 관리 프로그램 - 학습 퀴즈</title>
+    <title>{{ t('대학생 성적 관리 프로그램 - 학습 퀴즈') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% include '_language_assets.html' %}
 </head>
-<body class="modern">
+<body>
     {% set active_page = 'quiz' %}
     {% include 'island.html' %}
 
-    <div class="container">
-        <header class="page-title">
-            <span class="page-sub">{{ year }}학년 · {{ name }}님 환영합니다!</span>
-            <h1>학습 퀴즈</h1>
-        </header>
+    <header class="page-hero">
+        <span class="glass-obj g1 round" aria-hidden="true">🧠</span>
+        <span class="glass-obj sm g2" aria-hidden="true">✏️</span>
+        <p class="eyebrow">QUIZ</p>
+        <h1>{{ t('전공 과목') }} <em class="hl">{{ t('학습 퀴즈') }}</em></h1>
+        <p class="lead">{{ t('과목과 문제 수를 고르고 바로 풀어 보세요. 틀린 문제는 AI 학습 파트너와 복습할 수 있어요.') }}</p>
+    </header>
 
+    <main class="container">
         <!-- 플래시 메시지 (서버 알림) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flash-messages">
                     {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
+                        <li class="{{ category }}">{{ message|ui_text }}</li>
                     {% endfor %}
                 </ul>
             {% endif %}
@@ -38,77 +40,102 @@
         <ul class="flash-messages" id="quiz-message" hidden></ul>
 
         <!-- 화면 1: 퀴즈 설정 -->
-        <div class="form-card" id="quiz-setup">
-            <h2>⚙️ 퀴즈 설정</h2>
-            <div class="form-row">
-                <!-- 과목 선택칸: 학년별 과목 구성은 추후 구현 (현재는 선택칸만 있으며 퀴즈 시작에 사용하지 않음) -->
-<select id="quiz-subject">
-    <option value="" disabled selected>과목 선택</option>
-    {% for sem, courses in curriculum.items() %}
-        <optgroup label="{{ sem }}">
-            {% for c in courses %}
-                <option value="{{ c }}">{{ c }}</option>
-            {% endfor %}
-        </optgroup>
-    {% endfor %}
-</select>
-                <select id="quiz-count">
-                    <option value="" disabled selected>문제 수</option>
-                    <option value="5">5문제</option>
-                    <option value="10">10문제</option>
-                </select>
-                <button type="button" class="btn-primary" id="quiz-start-btn">퀴즈 시작</button>
+        <section class="form-card" id="quiz-setup">
+            <h2>{{ t('⚙️ 퀴즈 설정') }}</h2>
+            <p class="card-desc">{{ t('AI 문제는 과목의 일반 학습 내용으로 생성됩니다. 실제 수업 범위와 다를 수 있고 정답에 오류가 있을 수 있습니다.') }}</p>
+
+            <div class="field-grid">
+                <div class="field span-all">
+                    <label for="quiz-topic">{{ t('학습 주제 (필수)') }}</label>
+                    <!-- 학습 주제: 공백 제외 1글자 이상 필수 (quiz.js 와 서버에서도 다시 확인) -->
+                    <input id="quiz-topic" maxlength="200" required minlength="1" placeholder="{{ t('해당 교과목에 대한 학습 주제를 입력하세요') }}">
+                </div>
+                <div class="field">
+                    <label for="quiz-subject">{{ t('과목 선택') }}</label>
+                    <!-- 과목 선택: 성적 등록 화면과 동일하게 학년/학기별 optgroup -->
+                    <select id="quiz-subject">
+                        <option value="" disabled selected>{{ t('과목 선택') }}</option>
+                        {% for sem, courses in curriculum.items() %}
+                            <optgroup label="{{ sem|ui_text }}">
+                                {% for c in courses %}
+                                    <option value="{{ c }}">{{ c |ui_text }}</option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="quiz-count">{{ t('문제 수 (1~5)') }}</label>
+                    <!-- 문제 수: AI 문제 1 ~ 5 -->
+                    <select id="quiz-count">
+                        <option value="" disabled selected>{{ t('문제 수 (1~5)') }}</option>
+                        {% for n in range(1, 6) %}
+                            <option value="{{ n }}">{{ n }}{{ t('문제') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-        </div>
+
+            <button type="button" class="btn-primary" id="quiz-start-btn">{{ t('퀴즈 시작') }}</button>
+            <p class="quiz-status" id="quiz-generation-status" role="status" aria-live="polite"></p>
+        </section>
 
         <!-- 화면 2: 문제 풀이 -->
-        <div class="list-card" id="quiz-play" hidden>
-            <h2>📖 문제 풀이 <span id="quiz-subject-label"></span></h2>
-            <p id="quiz-progress-text" style="font-weight:bold;">문제 1 / 5</p>
+        <section class="list-card" id="quiz-play" hidden>
+            <div class="card-head">
+                <h2>{{ t('📖 문제 풀이') }}</h2>
+                <span class="chip chip-blue" id="quiz-subject-label"></span>
+            </div>
+            <p class="quiz-progress-text" id="quiz-progress-text">{{ t('문제 1 / 5') }}</p>
             <div class="quiz-progress">
-                <div id="quiz-progress-fill" class="quiz-progress-fill"></div>
+                <div class="quiz-progress-fill" id="quiz-progress-fill"></div>
             </div>
 
-            <h3 id="quiz-question">문제가 여기에 표시됩니다.</h3>
+            <h3 id="quiz-question">{{ t('문제가 여기에 표시됩니다.') }}</h3>
 
             <!-- 4지선다: 보기 텍스트는 quiz.js에서 채움 / 선택한 보기를 다시 누르면 선택 해제 -->
             <div id="quiz-choices" class="quiz-choices">
-                <label class="quiz-choice">
-                    <input type="radio" name="quiz-choice" value="0"> <span>① 보기 1</span>
-                </label>
-                <label class="quiz-choice">
-                    <input type="radio" name="quiz-choice" value="1"> <span>② 보기 2</span>
-                </label>
-                <label class="quiz-choice">
-                    <input type="radio" name="quiz-choice" value="2"> <span>③ 보기 3</span>
-                </label>
-                <label class="quiz-choice">
-                    <input type="radio" name="quiz-choice" value="3"> <span>④ 보기 4</span>
-                </label>
+                <label class="quiz-choice"><input type="radio" name="quiz-choice" value="0"> <span>{{ t('① 보기 1') }}</span></label>
+                <label class="quiz-choice"><input type="radio" name="quiz-choice" value="1"> <span>{{ t('② 보기 2') }}</span></label>
+                <label class="quiz-choice"><input type="radio" name="quiz-choice" value="2"> <span>{{ t('③ 보기 3') }}</span></label>
+                <label class="quiz-choice"><input type="radio" name="quiz-choice" value="3"> <span>{{ t('④ 보기 4') }}</span></label>
             </div>
 
             <div class="quiz-nav">
-                <button type="button" class="btn-back" id="quiz-prev-btn">이전</button>
-                <button type="button" class="btn-primary" id="quiz-next-btn">다음</button>
+                <button type="button" class="btn-back" id="quiz-prev-btn">{{ t('이전') }}</button>
+                <button type="button" class="btn-primary" id="quiz-next-btn">{{ t('다음') }}</button>
             </div>
-        </div>
+        </section>
 
-        <!-- 화면 3: 결과 -->
-        <div class="summary-card" id="quiz-result" hidden>
-            <h2>🏁 퀴즈 결과</h2>
-            <p><strong>맞힌 문제 수:</strong> <span id="quiz-result-score">0 / 0</span> 문제</p>
-            <p><strong>정답률:</strong> <span id="quiz-result-detail">0</span> %</p>
+        <!-- 화면 3: 결과 (출제된 모든 문제를 O/X로 구분해서 표시) -->
+        <section class="summary-card" id="quiz-result" hidden>
+            <h2>{{ t('🏁 퀴즈 결과') }}</h2>
+            <div class="stat-row">
+                <div class="stat stat-blue">
+                    <span class="stat-value" id="quiz-result-score">0 / 0</span>
+                    <span class="stat-label">{{ t('맞힌 문제 수:')|replace(':', '') }}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value"><span id="quiz-result-detail">0</span><small>%</small></span>
+                    <span class="stat-label">{{ t('정답률:')|replace(':', '') }}</span>
+                </div>
+            </div>
 
-        <h3>📝 문제별 결과</h3>
+            <h3>{{ t('📋 문제별 결과') }}</h3>
             <div id="quiz-review-list"></div>
 
-            <div style="margin-top:20px;">
-                <button type="button" class="btn-primary" id="quiz-retry-btn">다시 풀기</button>
+            <div class="btn-row" style="margin-top:20px;">
+                <button type="button" class="btn-primary" id="quiz-retry-btn">{{ t('같은 문제 다시 풀기') }}</button>
+                <button type="button" class="btn-back" id="quiz-new-btn">{{ t('다른 퀴즈 설정') }}</button>
+                <button type="button" class="btn-primary" id="quiz-ai-review-btn">{{ t('AI와 오답 복습하기') }}</button>
+                <button type="button" class="btn-primary" id="quiz-ai-analysis-btn">{{ t('AI와 강점·복습 영역 확인하기') }}</button>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
+    {% include '_footer.html' %}
+
+    <script src="{{ url_for('study_ai.static', filename='quiz-bridge.js') }}"></script>
     <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

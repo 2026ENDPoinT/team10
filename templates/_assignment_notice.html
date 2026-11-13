@@ -1,0 +1,9 @@
+{% set notice = assignment_notice() %}
+{% if notice.today or notice.soon or notice.overdue %}
+<aside role="status" class="notice-bar">
+  <span aria-hidden="true">🔔</span>
+  <strong>{{ t('오늘 마감인 과제가') }} {{ notice.today }}{{ t('개, 3일 이내 마감인 과제가') }} {{ notice.soon }}{{ t('개 있어요.') }}</strong>
+  {% if notice.overdue %}<span>{{ t('마감이 지난 미완료 과제는') }} {{ notice.overdue }}{{ t('개입니다.') }}</span>{% endif %}
+  <a href="{{ url_for('assignments.index') }}#pending">{{ t('확인하기 →') }}</a>
+</aside>
+{% endif %}

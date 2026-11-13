@@ -1,0 +1,3 @@
+{# 언어 전환 스크립트 (토글 버튼 모양은 static/css/style.css 의 "KOR / ENG 토글" 참고) #}
+<script>window.UI_LANGUAGE = {{ ui_language|tojson }}; window.UI_TRANSLATIONS = {{ ui_translations|tojson }};</script>
+<script src="{{ url_for('static', filename='js/language.js') }}"></script>

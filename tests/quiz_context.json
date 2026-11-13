@@ -1,0 +1,17 @@
+{
+  "subject": "프로그래밍입문(1)",
+  "questions": [
+    {
+      "question": "화면에 값을 출력할 때 사용하는 파이썬 내장 함수는?",
+      "choices": [
+        "input()",
+        "print()",
+        "echo()",
+        "show()"
+      ],
+      "answer": 1,
+      "selected_answer": 0,
+      "explanation": "print()는 값을 화면에 출력하는 함수입니다."
+    }
+  ]
+}

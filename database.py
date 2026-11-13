@@ -1,25 +1,52 @@
 import sqlite3
+from pathlib import Path
+
 
 def update_student_password(student_id, old_password, new_password):
+    """비밀번호 변경. 결과: 'ok' | 'same' | 'taken' | 'not_found'
+
+    students 테이블의 기본키가 (student_id, password) 이므로, 같은 학번에서 이미 다른 성적 셋이
+    사용 중인 비밀번호로 바꾸면 UNIQUE 제약 오류가 난다. 미리 확인하고 오류 대신 결과 코드로 알려준다.
+    """
+    if new_password == old_password:
+        return 'same'
+
     conn = get_db_connection()
-    cursor = conn.cursor()
-    # 학생 정보 테이블 비밀번호 수정
-    cursor.execute('''
-        UPDATE students 
-        SET password = ? 
-        WHERE student_id = ? AND password = ?
-    ''', (new_password, student_id, old_password))
-    
-    # 해당 학생이 등록한 과목들의 비밀번호 연결 정보도 함께 수정
-    cursor.execute('''
-        UPDATE courses 
-        SET password = ? 
-        WHERE student_id = ? AND password = ?
-    ''', (new_password, student_id, old_password))
-    
-    conn.commit()
-    conn.close()
-    
+    try:
+        cursor = conn.cursor()
+        taken = cursor.execute(
+            'SELECT 1 FROM students WHERE student_id = ? AND password = ?',
+            (student_id, new_password)
+        ).fetchone()
+        if taken:
+            return 'taken'
+
+        # 학생 정보 테이블 비밀번호 수정
+        cursor.execute('''
+            UPDATE students
+            SET password = ?
+            WHERE student_id = ? AND password = ?
+        ''', (new_password, student_id, old_password))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return 'not_found'
+
+        # 해당 학생이 등록한 과목들의 비밀번호 연결 정보도 함께 수정
+        cursor.execute('''
+            UPDATE courses
+            SET password = ?
+            WHERE student_id = ? AND password = ?
+        ''', (new_password, student_id, old_password))
+
+        conn.commit()
+        return 'ok'
+    except sqlite3.IntegrityError:
+        # 확인 직후 다른 요청이 같은 비밀번호를 만든 경우 등: 변경 내용 전체 취소
+        conn.rollback()
+        return 'taken'
+    finally:
+        conn.close()
+
 def get_db_connection():
     conn = sqlite3.connect('database.db')
     conn.row_factory = sqlite3.Row
@@ -50,6 +77,12 @@ def init_db():
             point REAL NOT NULL
         )
     ''')
+    # CREATE TABLE IF NOT EXISTS does not upgrade an existing table.
+    columns = {row['name'] for row in conn.execute('PRAGMA table_info(courses)')}
+    if 'password' not in columns:
+        # Legacy rows have no known credential. Preserve them without assigning
+        # them to an arbitrary account; NULL will not match a login password.
+        conn.execute('ALTER TABLE courses ADD COLUMN password TEXT')
     conn.commit()
     conn.close()
 
@@ -64,6 +97,16 @@ def save_or_update_student(student_id, name, year, password):
     ''', (student_id, password, name, year))
     conn.commit()
     conn.close()
+
+def get_student(student_id, password):
+    # students 테이블에는 별도 id 컬럼이 없으므로 SQLite rowid를 id로 사용
+    conn = get_db_connection()
+    student = conn.execute(
+        'SELECT rowid AS id, * FROM students WHERE student_id = ? AND password = ?',
+        (student_id, password)
+    ).fetchone()
+    conn.close()
+    return student
 
 def get_all_courses(student_id, password):
     conn = get_db_connection()

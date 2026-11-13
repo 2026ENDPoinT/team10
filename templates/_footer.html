@@ -1,0 +1,33 @@
+{# 모든 화면 공통 푸터 #}
+<footer class="site-footer">
+    <div class="site-footer-inner">
+        <div>
+            <div class="footer-brand"><span aria-hidden="true">🎓</span> Team 10</div>
+            <p>{{ t('성적부터 과제까지, 대학 생활을 한 곳에서 관리하세요.') }}</p>
+        </div>
+        <div>
+            <h4>{{ t('성적') }}</h4>
+            <ul>
+                <li><a href="{{ url_for('scores') }}">{{ t('성적') }}</a></li>
+                <li><a href="{{ url_for('manage') }}">{{ t('관리') }}</a></li>
+                <li><a href="{{ url_for('predict') }}">{{ t('예측') }}</a></li>
+            </ul>
+        </div>
+        {% if not landing_page %}
+        <div>
+            <h4>{{ t('학습') }}</h4>
+            <ul>
+                <li><a href="{{ url_for('quiz') }}">{{ t('퀴즈') }}</a></li>
+                <li><a href="{{ url_for('study_ai.index') }}">{{ t('AI 학습 파트너') }}</a></li>
+            </ul>
+        </div>
+        {% endif %}
+        <div>
+            <h4>{{ t('일정') }}</h4>
+            <ul>
+                <li><a href="{{ url_for('assignments.index') }}">{{ t('과제') }}</a></li>
+            </ul>
+        </div>
+    </div>
+    <p class="footer-copy">© 2026 Team 10</p>
+</footer>

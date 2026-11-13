@@ -1,107 +1,117 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ ui_language }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>대학생 성적 관리 프로그램 - 과목 관리</title>
+    <title>{{ t('대학생 성적 관리 프로그램 - 과목 관리') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% include '_language_assets.html' %}
 </head>
-<body class="modern">
+<body>
     {% set active_page = 'manage' %}
     {% include 'island.html' %}
 
-    <div class="container">
-        <header class="page-title">
-            <span class="page-sub">{{ year }}학년 · 학번: {{ student_id }} · {{ name }}님 환영합니다!</span>
-            <h1>과목 찾기 및 관리</h1>
-            <a href="{{ url_for('logout') }}" class="btn-back-main" style="background-color: #dc3545;">로그아웃</a>
-        </header>
+    <header class="page-hero">
+        <span class="glass-obj g1 round" aria-hidden="true">🔍</span>
+        <span class="glass-obj sm g2" aria-hidden="true">📚</span>
+        <p class="eyebrow">MANAGE</p>
+        <h1>{{ t('과목 찾기 및') }} <em class="hl">{{ t('관리') }}</em></h1>
+        <p class="lead">{{ year }}{{ t('학년 · 학번:') }} {{ student_id }} · {{ name }}{{ t('님 환영합니다!') }}</p>
+    </header>
 
+    <main class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flash-messages">
                     {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
+                        <li class="{{ category }}">{{ message|ui_text }}</li>
                     {% endfor %}
                 </ul>
             {% endif %}
         {% endwith %}
 
         <!-- 과목 찾기 기능 (선택형) -->
-        <div class="form-card" style="background-color: #f8f9fa; border-left: 5px solid #17a2b8;">
-            <h2>🔍 과목 찾기</h2>
+        <section class="form-card">
+            <h2>{{ t('🔍 과목 찾기') }}</h2>
             <form method="GET" action="{{ url_for('manage') }}">
-                <div class="form-row" style="display: flex; gap: 10px; align-items: center;">
-                    <select name="search_course" required style="flex: 1; padding: 10px;">
-                        <option value="" disabled selected>찾을 과목을 선택하세요</option>
+                <div class="form-row">
+                    <select name="search_course" required aria-label="{{ t('찾을 과목을 선택하세요') }}">
+                        <option value="" disabled {% if not selected_search_course %}selected{% endif %}>{{ t('찾을 과목을 선택하세요') }}</option>
                         {% for sem, courses in curriculum.items() %}
-                            <optgroup label="{{ sem }}">
+                            <optgroup label="{{ sem|ui_text }}">
                                 {% for c in courses %}
-                                    <option value="{{ c }}" {% if selected_search_course == c %}selected{% endif %}>{{ c }}</option>
+                                    <option value="{{ c }}" {% if selected_search_course == c %}selected{% endif %}>{{ c |ui_text }}</option>
                                 {% endfor %}
                             </optgroup>
                         {% endfor %}
                     </select>
-                    <button type="submit" class="btn-primary" style="padding: 10px 20px; background-color: #17a2b8;">확인</button>
+                    <button type="submit" class="btn-primary">{{ t('확인') }}</button>
                 </div>
             </form>
 
             {% if searched %}
-                <div class="search-result-box" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">
-                    <h4>검색 결과 ('{{ selected_search_course }}')</h4>
-                    {% if search_result_semester %}
-                        <p style="color: #28a745; margin-top: 5px; font-weight: bold;">
-                            해당 과목은 <strong>{{ search_result_semester }}</strong>에 존재합니다.
-                        </p>
-                    {% else %}
-                        <p style="color: #dc3545; margin-top: 5px; font-weight: bold;">
-                            해당 과목이 없습니다.
-                        </p>
-                    {% endif %}
-                </div>
+                {% if search_result_semester %}
+                    <div class="search-result found">
+                        ✅ <span>{{ t("검색 결과 ('") }}{{ selected_search_course|ui_text }}') — {{ t('해당 과목은') }} <strong>{{ search_result_semester|ui_text }}</strong>{{ t('에 존재합니다.') }}</span>
+                    </div>
+                {% else %}
+                    <div class="search-result missing">
+                        ⚠️ <span>{{ t("검색 결과 ('") }}{{ selected_search_course|ui_text }}') — {{ t('해당 과목이 없습니다.') }}</span>
+                    </div>
+                {% endif %}
             {% endif %}
-        </div>
+        </section>
 
         <!-- 과목 조회 및 관리 (수정 및 삭제 기능 포함) -->
-        <div class="list-card">
-            <h2>📚 과목 조회 및 관리 (수정 및 삭제 가능)</h2>
+        <section class="list-card">
+            <h2>{{ t('📚 과목 조회 및 관리 (수정 및 삭제 가능)') }}</h2>
             {% if stats.semesters %}
                 {% for semester, data in stats.semesters.items() %}
                     <div class="semester-group">
-                        <h3>{{ semester }} (학기 평점: {{ data.gpa }} / 4.5 | 취득 학점: {{ data.credits }}학점)</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>과목명</th>
-                                    <th>학점</th>
-                                    <th>등급</th>
-                                    <th>평점</th>
-                                    <th>관리 (수정/삭제)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for course in data.courses %}
-                                <tr>
-                                    <td>{{ course.name }}</td>
-                                    <td>{{ course.credit }}</td>
-                                    <td>{{ course.grade }}</td>
-                                    <td>{{ course.point }}</td>
-                                    <td>
-                                        <a href="{{ url_for('edit', course_id=course.id) }}" class="btn-edit">수정</a>
-                                        <form action="{{ url_for('delete', course_id=course.id) }}" method="POST" style="display:inline;">
-                                            <button type="submit" class="btn-delete" onclick="return confirm('정말 삭제하시겠습니까?');">삭제</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        <div class="semester-head">
+                            <h3>{{ semester|ui_text }}</h3>
+                            <span class="chip chip-blue">{{ t('(학기 평점:')|replace('(', '') }} {{ data.gpa }} / 4.5</span>
+                            <span class="chip chip-blue">{{ data.credits }}{{ t('학점') }}</span>
+                        </div>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>{{ t('과목명') }}</th>
+                                        <th>{{ t('학점') }}</th>
+                                        <th>{{ t('등급') }}</th>
+                                        <th>{{ t('평점') }}</th>
+                                        <th>{{ t('관리 (수정/삭제)') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for course in data.courses %}
+                                    <tr>
+                                        <td>{{ course.name|ui_text }}</td>
+                                        <td>{{ course.credit }}</td>
+                                        <td><strong>{{ course.grade }}</strong></td>
+                                        <td>{{ course.point }}</td>
+                                        <td>
+                                            <div class="table-actions">
+                                                <a href="{{ url_for('edit', course_id=course.id) }}" class="btn-edit">{{ t('수정') }}</a>
+                                                <form action="{{ url_for('delete', course_id=course.id) }}" method="POST">
+                                                    <button type="submit" class="btn-delete" onclick="return confirm(uiText('정말 삭제하시겠습니까?'));">{{ t('삭제') }}</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 {% endfor %}
             {% else %}
-                <p class="empty-msg">등록된 과목이 없습니다. 성적 페이지에서 과목을 추가해주세요.</p>
+                <p class="empty-msg">{{ t('등록된 과목이 없습니다. 성적 페이지에서 과목을 추가해주세요.') }}</p>
             {% endif %}
-        </div>
-    </div>
+        </section>
+    </main>
+
+    {% include '_footer.html' %}
 </body>
 </html>

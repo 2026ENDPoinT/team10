@@ -1,86 +1,268 @@
+{#
+  첫 화면(랜딩 홈페이지)
+  1) 히어로: 큰 제목 + 버튼 (왼쪽) / 로그인 칸 (오른쪽, 기존 로그인 폼)
+  2) 기능 설명 칸: 6개 탭을 아주 짧게 소개 + "자세히 알아보기"
+  3) #details: 번호(01~06)가 붙은 기능 행으로 길게 설명 ("자세히 알아보기" 누르면 여기로 스크롤)
+  4) 숫자 통계 띠 → 파란 CTA 띠 → 푸터
+  - 로그인 폼의 name / id 는 기존과 동일 (/login 라우트와 호환)
+#}
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="{{ ui_language }}">
 <head>
     <meta charset="UTF-8">
-    <title>대학생 성적 관리 프로그램 - 로그인</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ t('대학생 성적 관리 프로그램 - 로그인') }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% include '_language_assets.html' %}
 </head>
-<body>
-    <div class="container login-container">
-        <h1>🎓 대학생 성적 관리 프로그램</h1>
-        <p class="desc">학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.<br>(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)</p>
+<body id="top">
+    {% set landing_page = true %}
+    <!-- 첫 화면은 아일랜드 없이 언어 전환 버튼만 표시 -->
+    <div class="landing-lang">{% include '_language_button.html' %}</div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="flash-messages">
-                    {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
+    <!-- ================= 1. 히어로 + 로그인 ================= -->
+    <header class="page-hero landing-hero">
+        <span class="glass-obj lg g1" aria-hidden="true">🎓</span>
+        <span class="glass-obj g2 round" aria-hidden="true">📘</span>
+        <span class="glass-obj sm g3" aria-hidden="true">✏️</span>
+        <span class="glass-obj g4" aria-hidden="true">📊</span>
 
-        <div class="form-card">
-            <form action="{{ url_for('login') }}" method="POST">
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label for="student_id" style="display:block; margin-bottom:5px; font-weight:bold;">학번</label>
-                    <input type="text" id="student_id" name="student_id" 
-                           placeholder="예: 26101167 (8자리 숫자, 0 시작 불가)" 
-                           pattern="[1-9][0-9]{7}" 
-                           maxlength="8" 
-                           inputmode="numeric"
-                           required 
-                           style="width:100%; padding:10px;">
+        <div class="landing-hero-inner">
+            <div>
+                <p class="eyebrow">{{ t('Team 10 · 대학생 학습 도우미') }}</p>
+                <h1>{{ t('성적부터 과제까지,') }}<br><em class="hl">{{ t('한 곳에서') }}</em> {{ t('관리하세요') }}</h1>
+                <p class="lead">{{ t('성적 계산, 기말고사 목표 예측, 전공 퀴즈, AI 학습 파트너, 과제 마감 관리까지 대학 생활에 필요한 기능을 모았습니다.') }}</p>
+                <div class="btn-row">
+                    {% if session.get('student_id') %}
+                        <a href="{{ url_for('scores') }}" class="btn-primary">{{ t('📊 내 성적으로') }}</a>
+                    {% else %}
+                        <a href="#login" class="btn-primary">{{ t('지금 시작하기') }}</a>
+                    {% endif %}
+                    <a href="#details" class="btn-secondary">{{ t('자세히 알아보기 ↓') }}</a>
                 </div>
+            </div>
 
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label for="name" style="display:block; margin-bottom:5px; font-weight:bold;">이름</label>
-                    <input type="text" id="name" name="name" placeholder="예: 김준호" required style="width:100%; padding:10px;">
-                </div>
+            <!-- 로그인 칸 (기존 로그인 탭) -->
+            <div class="landing-login" id="login">
+                <h2>{{ t('🔐 로그인') }}</h2>
+                <p class="desc">{{ t('학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.') }}<br>{{ t('(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)') }}</p>
 
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label for="year" style="display:block; margin-bottom:5px; font-weight:bold;">학년</label>
-                    <select id="year" name="year" required style="width:100%; padding:10px;">
-                        <option value="" disabled selected>학년을 선택하세요</option>
-                        <option value="1">1학년</option>
-                        <option value="2">2학년</option>
-                        <option value="3">3학년</option>
-                        <option value="4">4학년</option>
-                    </select>
-                </div>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <ul class="flash-messages">
+                            {% for category, message in messages %}
+                                <li class="{{ category }}">{{ message|ui_text }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
 
-                <div class="input-group" style="margin-bottom: 20px;">
-                    <label for="password" style="display:block; margin-bottom:5px; font-weight:bold;">비밀번호</label>
-                    <!-- 비밀번호 입력란과 보기 버튼을 감싸는 컨테이너 -->
-                    <div style="position: relative; display: flex; align-items: center;">
-                        <input type="password" id="password" name="password" 
-                               placeholder="특수문자(!@#$%^&*) 포함 필수" 
-                               required 
-                               style="width:100%; padding:10px; padding-right: 45px;">
-                        <button type="button" id="togglePassword" 
-                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 18px;" 
-                                title="비밀번호 표시/숨기기">(-)</button>
+                <form action="{{ url_for('login') }}" method="POST">
+                    <div class="field">
+                        <label for="student_id">{{ t('학번') }}</label>
+                        <input type="text" id="student_id" name="student_id"
+                               placeholder="{{ t('예: 26101167 (8자리 숫자, 0 시작 불가)') }}"
+                               pattern="[1-9][0-9]{7}" maxlength="8" inputmode="numeric" required>
                     </div>
-                </div>
 
-                <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
-                    로그인 및 성적 관리 시작
-                </button>
-            </form>
+                    <div class="field-grid" style="margin-bottom:0;">
+                        <div class="field">
+                            <label for="name">{{ t('이름') }}</label>
+                            <input type="text" id="name" name="name" placeholder="{{ t('예: 김준호') }}" required>
+                        </div>
+                        <div class="field">
+                            <label for="year">{{ t('학년') }}</label>
+                            <select id="year" name="year" required>
+                                <option value="" disabled selected>{{ t('학년을 선택하세요') }}</option>
+                                <option value="1">{{ t('1학년') }}</option>
+                                <option value="2">{{ t('2학년') }}</option>
+                                <option value="3">{{ t('3학년') }}</option>
+                                <option value="4">{{ t('4학년') }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="password">{{ t('비밀번호') }}</label>
+                        <div class="password-wrap">
+                            <input type="password" id="password" name="password"
+                                   placeholder="{{ t('5~20자, 특수문자(!@#$%^&*) 포함') }}"
+                                   minlength="5" maxlength="20" pattern=".*[!@#$%^&*].*"
+                                   title="{{ t('비밀번호는 5~20자이며 특수문자(!@#$%^&*)를 1개 이상 포함해야 합니다.') }}"
+                                   aria-describedby="password-rules" required>
+                            <button type="button" id="togglePassword" title="{{ t('비밀번호 표시/숨기기') }}">(-)</button>
+                        </div>
+                        {% with pw_input = 'password' %}{% include '_password_rules.html' %}{% endwith %}
+                    </div>
+
+                    <button type="submit" class="btn-primary">{{ t('로그인 및 성적 관리 시작') }}</button>
+                </form>
+            </div>
         </div>
-    </div>
+    </header>
 
-    <!-- 비밀번호 보기/숨기기 토글 스크립트 -->
+    <!-- ================= 2. 기능 설명 칸 (짧은 소개) ================= -->
+    <section class="landing-section">
+        <div class="landing-inner">
+            <div class="section-head">
+                <p class="eyebrow">{{ t('대학생을 위한 올인원 도구') }}</p>
+                <h2><em class="hl">{{ t('꼼꼼') }}</em>{{ t('하게 기록하고,') }}<br><em class="hl">{{ t('똑똑') }}</em>{{ t('하게 공부해요.') }}</h2>
+            </div>
+
+            <div class="feature-grid">
+                <a class="feature-tile" href="#feature-1"><span class="feature-icon">📊</span><div><strong>{{ t('성적') }}</strong><small>{{ t('과목 등록 · 평점 · 추이 그래프') }}</small></div></a>
+                <a class="feature-tile" href="#feature-2"><span class="feature-icon">⚙️</span><div><strong>{{ t('관리') }}</strong><small>{{ t('과목 찾기 · 수정 · 삭제') }}</small></div></a>
+                <a class="feature-tile" href="#feature-3"><span class="feature-icon">🎯</span><div><strong>{{ t('예측') }}</strong><small>{{ t('목표 학점별 기말 점수 계산') }}</small></div></a>
+                <a class="feature-tile" href="#feature-4"><span class="feature-icon">🧠</span><div><strong>{{ t('퀴즈') }}</strong><small>{{ t('전공 과목 학습 퀴즈') }}</small></div></a>
+                <a class="feature-tile" href="#feature-5"><span class="feature-icon">🤖</span><div><strong>AI</strong><small>{{ t('문제 해설 · 힌트 학습 파트너') }}</small></div></a>
+                <a class="feature-tile" href="#feature-6"><span class="feature-icon">📅</span><div><strong>{{ t('과제') }}</strong><small>{{ t('마감 일정 · D-day 알림') }}</small></div></a>
+            </div>
+
+            <div class="center-cta">
+                <a href="#details" class="btn-more">{{ t('자세히 알아보기 ↓') }}</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= 3. 자세히 알아보기 ================= -->
+    <section class="detail-section" id="details">
+        <div class="section-head">
+            <p class="eyebrow">FEATURES</p>
+            <h2>{{ t('이런 기능을 사용할 수 있어요') }}</h2>
+        </div>
+
+        <div class="detail-row" id="feature-1">
+            <div class="detail-text">
+                <h3>{{ t('한눈에 보는') }} <em class="hl">{{ t('성적') }}</em></h3>
+                <p>{{ t('커리큘럼에 있는 과목을 골라 수강 연도·학기·성적 등급을 입력하면 학점이 자동으로 채워집니다. 전체 평점과 이수 학점을 바로 계산해 보여주고, 학기별 평점 변화를 꺾은선 그래프로 확인할 수 있어 내 성적 흐름을 한눈에 파악할 수 있습니다.') }}</p>
+                <ul class="tag-list"><li>{{ t('학점 자동 입력') }}</li><li>{{ t('전체 평점') }}</li><li>{{ t('학기별 그래프') }}</li></ul>
+                <a class="more-link" href="{{ url_for('scores') }}">{{ t('바로 가기 →') }}</a>
+            </div>
+            <div class="detail-visual" aria-hidden="true">
+                <div class="mock">
+                    <div class="mock-title">📈 GPA</div>
+                    <div class="mock-bars"><span style="height:55%"></span><span style="height:70%"></span><span style="height:62%"></span><span style="height:84%"></span><span style="height:92%"></span></div>
+                </div>
+                <span class="detail-number">01</span>
+            </div>
+        </div>
+
+        <div class="detail-row reverse" id="feature-2">
+            <div class="detail-text">
+                <h3>{{ t('빠르고 정확한') }} <em class="hl">{{ t('과목 관리') }}</em></h3>
+                <p>{{ t('등록한 과목을 학기별로 모아 보여줍니다. 과목 이름으로 검색해 언제 수강했는지 바로 찾을 수 있고, 잘못 입력한 과목은 수정하거나 삭제할 수 있습니다. 같은 과목이 중복 등록되지 않도록 자동으로 확인합니다.') }}</p>
+                <ul class="tag-list"><li>{{ t('과목 검색') }}</li><li>{{ t('수정 · 삭제') }}</li><li>{{ t('중복 방지') }}</li></ul>
+                <a class="more-link" href="{{ url_for('manage') }}">{{ t('바로 가기 →') }}</a>
+            </div>
+            <div class="detail-visual" aria-hidden="true">
+                <div class="mock mock-rows">
+                    <div class="mock-title">📚 2026</div>
+                    <div>{{ t('자료구조') }} <b>A+</b></div>
+                    <div>{{ t('선형대수학') }} <b>A0</b></div>
+                    <div>{{ t('알고리즘') }} <b>B+</b></div>
+                </div>
+                <span class="detail-number">02</span>
+            </div>
+        </div>
+
+        <div class="detail-row" id="feature-3">
+            <div class="detail-text">
+                <h3>{{ t('목표를 숫자로,') }} <em class="hl">{{ t('성적 예측') }}</em></h3>
+                <p>{{ t('수강 인원, 내 중간고사 점수, 중간고사 평균·표준편차, 시험 반영 비율과 목표 학점을 입력하면 정규분포를 바탕으로 목표 학점을 받기 위해 기말고사에서 필요한 점수와 석차를 계산해 줍니다. 시험 준비 목표를 숫자로 세울 수 있습니다.') }}</p>
+                <ul class="tag-list"><li>{{ t('목표 등급') }}</li><li>{{ t('필요 점수') }}</li><li>{{ t('필요 석차') }}</li></ul>
+                <a class="more-link" href="{{ url_for('predict') }}">{{ t('바로 가기 →') }}</a>
+            </div>
+            <div class="detail-visual" aria-hidden="true">
+                <div class="mock">
+                    <div class="mock-title">🎯 A+</div>
+                    <div class="mock-gauge"><span>72%</span></div>
+                </div>
+                <span class="detail-number">03</span>
+            </div>
+        </div>
+
+        <div class="detail-row reverse" id="feature-4">
+            <div class="detail-text">
+                <h3>{{ t('전공 과목') }} <em class="hl">{{ t('학습 퀴즈') }}</em></h3>
+                <p>{{ t('학년·학기별 전공 과목을 골라 객관식 퀴즈를 풀 수 있습니다. 풀이가 끝나면 문제마다 정답 여부와 해설을 보여주고, 틀린 문제는 AI 학습 파트너에게 바로 넘겨 다시 공부할 수 있습니다.') }}</p>
+                <ul class="tag-list"><li>{{ t('문제은행') }}</li><li>{{ t('AI 새 문제') }}</li><li>{{ t('정답 해설') }}</li></ul>
+            </div>
+            <div class="detail-visual" aria-hidden="true">
+                <div class="mock">
+                    <div class="mock-title">🧠 Q 3 / 5</div>
+                    <div class="mock-choice">① O(n)</div>
+                    <div class="mock-choice on">② O(log n)</div>
+                    <div class="mock-choice">③ O(n²)</div>
+                </div>
+                <span class="detail-number">04</span>
+            </div>
+        </div>
+
+        <div class="detail-row" id="feature-5">
+            <div class="detail-text">
+                <h3>{{ t('함께 공부하는') }} <em class="hl">{{ t('AI 학습 파트너') }}</em></h3>
+                <p>{{ t('AI 튜터와 대화하며 공부할 수 있습니다. 퀴즈 문제 해설과 힌트, 틀린 문제 복습, 전체 결과에 대한 강점·보완점 분석, 관련 강의 검색과 연습 문제 출제까지 도와줍니다. 답을 바로 알려주기보다 한 문제씩 함께 이해하도록 안내합니다.') }}</p>
+                <ul class="tag-list"><li>{{ t('개념 설명') }}</li><li>{{ t('힌트 받기') }}</li><li>{{ t('추천 강의 찾기') }}</li></ul>
+            </div>
+            <div class="detail-visual" aria-hidden="true">
+                <div class="mock">
+                    <div class="mock-title">🤖 AI</div>
+                    <div class="mock-bubble me">{{ t('이진 탐색이 왜 빠른가요?') }}</div>
+                    <div class="mock-bubble">{{ t('매번 탐색 범위를 절반으로 줄이기 때문이에요.') }}</div>
+                </div>
+                <span class="detail-number">05</span>
+            </div>
+        </div>
+
+        <div class="detail-row reverse" id="feature-6">
+            <div class="detail-text">
+                <h3>{{ t('놓치지 않는') }} <em class="hl">{{ t('과제 관리') }}</em></h3>
+                <p>{{ t('과목별로 과제명과 마감 날짜·시간(한국 시간 기준)을 등록해 할 일과 완료한 과제를 나눠 관리합니다. 마감까지 남은 시간을 D-day로 보여주고, 마감이 다가온 과제는 다른 화면 상단에서도 알림으로 확인할 수 있습니다.') }}</p>
+                <ul class="tag-list"><li>{{ t('마감 순 정렬') }}</li><li>D-day</li><li>{{ t('마감 알림') }}</li></ul>
+                <a class="more-link" href="{{ url_for('assignments.index') }}">{{ t('바로 가기 →') }}</a>
+            </div>
+            <div class="detail-visual" aria-hidden="true">
+                <div class="mock">
+                    <div class="mock-title">📅 TODO</div>
+                    <div class="mock-task">{{ t('3주차 실습 보고서') }} <em>D-1</em></div>
+                    <div class="mock-task">{{ t('알고리즘 과제') }} <em>D-3</em></div>
+                    <div class="mock-task">{{ t('팀 프로젝트 발표') }} <em>D-7</em></div>
+                </div>
+                <span class="detail-number">06</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= 4. 숫자 통계 띠 ================= -->
+    <section class="landing-stats">
+        <div class="stat-row">
+            <div class="stat"><span class="stat-value">6<sup>+</sup></span><span class="stat-label">{{ t('핵심 기능') }}</span></div>
+            <div class="stat"><span class="stat-value">8</span><span class="stat-label">{{ t('학기 커리큘럼 지원') }}</span></div>
+            <div class="stat"><span class="stat-value">4.5</span><span class="stat-label">{{ t('만점 기준 평점 계산') }}</span></div>
+            <div class="stat"><span class="stat-value">2<sup>KOR · ENG</sup></span><span class="stat-label">{{ t('언어 지원') }}</span></div>
+        </div>
+    </section>
+
+    <!-- ================= 5. 파란 CTA 띠 ================= -->
+    <section class="cta-band">
+        <span class="glass-obj g1 round" aria-hidden="true">💬</span>
+        <span class="glass-obj sm g2" aria-hidden="true">📈</span>
+        <span class="glass-obj sm g3" aria-hidden="true">🧠</span>
+        <span class="glass-obj g4 round" aria-hidden="true">📅</span>
+        <p class="eyebrow">{{ t('처음 만나는 학습 관리 도우미') }}</p>
+        <h2>{{ t('Team 10과 함께 시작하세요!') }}</h2>
+        <a href="#login" class="btn-secondary">{{ t('지금 로그인하고 시작하기 ↑') }}</a>
+    </section>
+
+    {% include '_footer.html' %}
+
     <script>
+        // 비밀번호 보기/숨기기 토글 (눈 모양 (-) / 가려진 눈 모양 (0))
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
-
         togglePassword.addEventListener('click', function () {
-            // input 타입이 password면 text로, text면 password로 전환
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
-            
-            // 아이콘 변경 (눈 모양 (-) / 가려진 눈 모양 (0))
             this.textContent = type === 'password' ? '(-)' : '(0)';
         });
     </script>
