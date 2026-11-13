@@ -13,6 +13,7 @@
                 <li><a href="{{ url_for('predict') }}">{{ t('예측') }}</a></li>
             </ul>
         </div>
+        {% if not landing_page %}
         <div>
             <h4>{{ t('학습') }}</h4>
             <ul>
@@ -20,6 +21,7 @@
                 <li><a href="{{ url_for('study_ai.index') }}">{{ t('AI 학습 파트너') }}</a></li>
             </ul>
         </div>
+        {% endif %}
         <div>
             <h4>{{ t('일정') }}</h4>
             <ul>

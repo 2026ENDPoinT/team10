@@ -161,15 +161,6 @@ a { color: var(--blue-600); }
 .page-hero .glass-obj.g3 { left: 16%; bottom: 40px; transform: rotate(8deg); }
 .page-hero .glass-obj.g4 { right: 18%; bottom: 28px; transform: rotate(-6deg); }
 
-@media (prefers-reduced-motion: no-preference) {
-    .glass-obj { animation: floaty 7s ease-in-out infinite; }
-    .glass-obj:nth-of-type(2n) { animation-delay: -3s; animation-duration: 8s; }
-    @keyframes floaty {
-        0%, 100% { translate: 0 0; }
-        50% { translate: 0 -10px; }
-    }
-}
-
 /* 섹션 제목 (가운데 정렬) */
 .section-head {
     margin: 0 auto 36px;
@@ -187,6 +178,23 @@ a { color: var(--blue-600); }
     margin: 12px 0 0;
     color: var(--ink-2);
 }
+
+/* 첫 화면: 아일랜드 대신 오른쪽 위 언어 전환 버튼만 */
+.landing-lang {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    padding: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10px 30px -14px rgba(36, 83, 240, 0.35);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+
+.landing-lang .site-language-toggle { border: none; background: transparent; }
 
 /* ---------- 2. 다이나믹 아일랜드 ---------- */
 .island-wrap {
@@ -220,20 +228,6 @@ a { color: var(--blue-600); }
 .island.scrolled {
     transform: scale(0.97);
     box-shadow: 0 14px 34px -10px rgba(20, 26, 46, 0.28);
-}
-
-.island-home {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6f9bff, var(--blue-600));
-    box-shadow: 0 6px 14px -6px rgba(36, 83, 240, 0.7);
-    font-size: 18px;
-    text-decoration: none;
 }
 
 .island-btn {
@@ -1284,7 +1278,6 @@ tbody tr:hover td { background: #fafcff; }
     .glass-obj { display: none; }
     .island { gap: 0; padding: 5px; }
     .island-btn { padding: 8px 5px; }
-    .island-home { width: 34px; height: 34px; margin-right: 2px; }
     .island-avatar { width: 32px; height: 32px; margin: 0 2px; }
     .island-divider,
     #openPasswordModal { display: none; }   /* 좁은 화면: 비번변경은 프로필 카드 안 버튼으로 */

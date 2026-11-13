@@ -1,6 +1,5 @@
 {#
   다이나믹 아일랜드 (모든 화면 공통, 화면 위에 고정)
-  - 맨 앞: 🏠 홈 버튼
   - 로그인 상태: 이름 첫 글자 버튼에 마우스를 올리면 학년/학번/이름 카드 표시
   - 로그아웃 상태(퀴즈·AI 화면을 바로 연 경우): 로그인 버튼 표시
   - 맨 끝: KOR / ENG 전환
@@ -11,8 +10,6 @@
 {% set island_student_id = student_id or session.get('student_id', '') %}
 <div class="island-wrap">
     <nav class="island" id="island" aria-label="{{ t('주요 메뉴') }}">
-        <a class="island-home" href="{{ url_for('index') }}" title="{{ t('처음 화면으로') }}" aria-label="{{ t('처음 화면으로') }}">🏠</a>
-
         <a class="island-btn {% if active_page == 'quiz' %}active{% endif %}"
            href="{{ url_for('quiz', student_id=island_student_id, name=island_name, year=island_year) }}"><span aria-hidden="true">🧠</span><span class="island-label">QUIZ</span></a>
 

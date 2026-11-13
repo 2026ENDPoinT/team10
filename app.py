@@ -10,7 +10,7 @@ from scipy.stats import norm
 
 from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student, get_student, update_student_password
 from gpa_calculator import GRADE_POINTS, calculate_gpa
-from study_ai import init_study_ai  
+from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
 from study_ai.generated_quiz import init_generated_quiz
 from assignments import init_assignments
 from localization import init_localization
@@ -24,7 +24,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
 
 
 init_db()
-init_study_ai(app)  
+init_study_ai(app)  # [추가] AI 튜터 블루프린트 등록
 
 COURSE_CREDITS = {
     "프로그래밍입문(1)": 3, "Introduction to Programming 1": 3,
@@ -288,6 +288,7 @@ def predict():
 
 @app.route('/quiz')
 def quiz():
+
     student_id = session.get('student_id', '')
     name = session.get('name', '')
     year = session.get('year', '')
@@ -374,6 +375,7 @@ def edit(course_id):
         flash('존재하지 않거나 권한이 없는 과목입니다.', 'error')
         return redirect(url_for('manage'))
 
+
     curr_year = "2026"
     curr_term = "1학기"
     if course and ' ' in course['semester']:
@@ -396,7 +398,7 @@ def edit(course_id):
             return redirect(url_for('edit', course_id=course_id, student_id=student_id, name=name, year=year))
 
         semester = f"{sel_year}년 {sel_sem}"
-
+    
         existing_courses = get_all_courses(student_id, session['password'])
         for c in existing_courses:
             if c['id'] != course_id and c['name'] == c_name:
