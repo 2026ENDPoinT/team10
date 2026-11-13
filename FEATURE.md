@@ -8,7 +8,7 @@ Branch: `feature/korean-study-partner`. This is a separate local clone of the te
 - Existing quiz result buttons: help with one question, review missed questions, or analyze ALL results for strengths and areas to review.
 - Evidence-aware tutoring: the AI sees actual answers; wrong-only context is insufficient to infer strengths. It must describe uncertainty and avoid declaring mastery from a single quiz.
 - Korean default responses and Korean main controls; language, level and lecture-length preferences.
-- OpenAI live mode requires a local key. YouTube result cards require an optional YouTube key; otherwise the app shows a labeled topic-search link.
+- Gemini is the default provider and requires a local Google AI Studio key. OpenAI remains optional. YouTube result cards require an optional YouTube key; otherwise the app shows a labeled topic-search link.
 - Separate local database, without importing existing student records. AI cannot edit grades.
 
 ## Limits

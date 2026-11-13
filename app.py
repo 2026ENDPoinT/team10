@@ -11,7 +11,7 @@ from gpa_calculator import GRADE_POINTS, calculate_gpa
 load_dotenv(Path(__file__).with_name('.env'))
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
-app.config.update(AI_MODE=os.getenv('AI_MODE', 'openai'), STUDY_BACK_ENDPOINT='scores',
+app.config.update(AI_MODE=os.getenv('AI_MODE', 'gemini'), STUDY_BACK_ENDPOINT='scores',
                   MAX_CONTENT_LENGTH=128 * 1024)
 init_study_ai(app)
 

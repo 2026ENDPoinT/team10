@@ -46,7 +46,7 @@ class IntegratedAppTests(unittest.TestCase):
         self.assertEqual(tutor.status_code, 200)
         self.assertIn(b'/scores?', tutor.data)
         self.assertIn(b'student_id=12345678', tutor.data)
-        self.assertIn(b'AI setup needed', tutor.data)
+        self.assertIn(b'OPENAI_API_KEY', tutor.data)
 
     def test_no_key_never_returns_fake_answer(self):
         response = self.client.post('/ai/api/chat', json={'message': 'Explain division.'})

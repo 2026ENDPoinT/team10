@@ -14,9 +14,9 @@ Keep the terminal/window open. After it says `Running on http://127.0.0.1:5002`,
 
 ## Real AI setup
 
-Copy `.env.example` to `.env` if the start script has not created it. In `.env`, fill in `OPENAI_API_KEY` with your own OpenAI API key and keep `AI_MODE=openai`. Stop and restart the app after changing configuration. This version does not silently substitute demo replies when the key is missing: it shows a setup message.
+Copy `.env.example` to `.env` if the start script has not created it. In `.env`, fill in `GEMINI_API_KEY` with your Google AI Studio key and keep `AI_MODE=gemini`. Stop and restart the app after changing configuration. This version does not silently substitute demo replies when the key is missing: it shows a setup message.
 
-An optional `YOUTUBE_API_KEY` enables real video search results. Without it the tutor provides a topic-search link on YouTube. Keys stay in the local `.env`, which is ignored by Git. Do not put them in chat or browser code. OpenAI API usage requires an API account with access/billing; a ChatGPT subscription alone is not the API configuration.
+An optional `YOUTUBE_API_KEY` enables real video search results. Without it the tutor provides a topic-search link on YouTube. Keys stay in the local `.env`, which is ignored by Git. Do not put them in chat or browser code. Use a Free-tier Google AI Studio project for free-tier testing. Usage limits and model availability depend on the project. The app does not enable billing or automatically switch providers.
 
 Official setup: [OpenAI](https://developers.openai.com/api/docs/quickstart), [YouTube](https://developers.google.com/youtube/v3/getting-started).
 
