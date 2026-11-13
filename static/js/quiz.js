@@ -113,6 +113,8 @@ QUESTION_BANK['Introduction to Programming 1'] = QUESTION_BANK['프로그래밍�
 // 퀴즈 진행 상태
 let quizQuestions = [];   // 이번 퀴즈에 출제된 문제 목록
 let userAnswers = [];     // 문제별 선택한 보기 (선택 안 함: null, 선택: 0~3)
+let generatedQuizId = null;
+let quizBusy = false;
 let currentIndex = 0;     // 현재 풀고 있는 문제 위치
 
 // 화면 요소
@@ -173,7 +175,8 @@ function shuffle(array) {
 }
 
 // 퀴즈 시작
-function startQuiz() {
+async function startQuiz() {
+    if (quizBusy) return;
     clearMessage();
 
     const subject = quizSubjectSelect.value;
@@ -188,6 +191,29 @@ function startQuiz() {
         return;
     }
 
+    if (document.getElementById('quiz-source')?.value === 'ai') {
+        if (count > 5) { showMessage('AI 퀴즈는 1~5문제를 선택해 주세요.'); return; }
+        quizBusy = true;
+        quizStartBtn.disabled = true;
+        const status = document.getElementById('quiz-generation-status');
+        status.textContent = '문제와 해설을 생성하고 있습니다. 잠시 기다려 주세요…';
+        try {
+            const data = await quizRequest('/ai/api/quiz/generate', {
+                subject, count, topic: document.getElementById('quiz-topic').value.trim()
+            });
+            generatedQuizId = data.quiz_id;
+            quizQuestions = data.questions;
+            userAnswers = new Array(quizQuestions.length).fill(null);
+            currentIndex = 0;
+            quizSubjectLabel.textContent = '- ' + subject + ' · AI 생성';
+            status.textContent = data.usage?.total_tokens ? '이번 생성 사용량: ' + data.usage.total_tokens + '토큰' : '생성 완료';
+            renderQuestion();
+            showSection('play');
+        } catch (error) { showMessage(error.message); status.textContent = '생성하지 못했습니다. 설정을 확인하고 다시 시도하세요.'; }
+        finally { quizBusy = false; quizStartBtn.disabled = false; }
+        return;
+    }
+    generatedQuizId = null;
     const bank = QUESTION_BANK[subject];
     if (!bank || bank.length === 0) {
         showMessage("'" + subject + "' 과목의 문제는 아직 준비 중입니다.");
@@ -248,12 +274,23 @@ function goPrev() {
     }
 }
 
-function goNext() {
+async function goNext() {
+    if (quizBusy) return;
     if (currentIndex < quizQuestions.length - 1) {
         currentIndex++;
         renderQuestion();
     } else {
-        showResult();
+        if (generatedQuizId) {
+            quizBusy = true;
+            quizNextBtn.disabled = true;
+            try {
+                const data = await quizRequest('/ai/api/quiz/grade', {quiz_id: generatedQuizId, answers: userAnswers});
+                quizQuestions = data.questions;
+                clearMessage();
+                showResult();
+            } catch (error) { showMessage(error.message); }
+            finally { quizBusy = false; quizNextBtn.disabled = false; }
+        } else { showResult(); }
     }
 }
 
@@ -296,7 +333,7 @@ function buildReviewItem(index) {
     const answerText = CHOICE_MARKS[q.answer] + ' ' + q.choices[q.answer];
 
     item.appendChild(createReviewLine('내 답:', myText));
-    if (!isCorrect) {
+    if (!isCorrect || generatedQuizId) {
         item.appendChild(createReviewLine('정답:', answerText));
 
         // 틀린 문제에만 해설 표시
@@ -348,7 +385,10 @@ function showResult() {
 // 다시 풀기: 설정 화면으로 돌아감 (다시 시작하면 문제가 새로 무작위 출제됨)
 function retryQuiz() {
     clearMessage();
-    showSection('setup');
+    userAnswers = new Array(quizQuestions.length).fill(null);
+    currentIndex = 0;
+    renderQuestion();
+    showSection('play');
 }
 
 // 이벤트 연결
@@ -379,3 +419,24 @@ document.getElementById('quiz-ai-analysis-btn').addEventListener('click', functi
         ));
     } catch (error) { showMessage(error.message); }
 });
+
+
+async function quizRequest(url, payload) {
+    const response = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    let data;
+    try { data = await response.json(); } catch (_) { throw new Error('서버 응답을 확인해 주세요.'); }
+    if (!response.ok) throw new Error(data.error || '요청에 실패했습니다.');
+    return data;
+}
+
+document.getElementById('quiz-new-btn').addEventListener('click', function () {
+    clearMessage(); showSection('setup');
+});
+function updateQuizSource() {
+    const ai = document.getElementById('quiz-source').value === 'ai';
+    for (const option of quizCountSelect.options) option.disabled = ai && Number(option.value) > 5;
+    if (ai && Number(quizCountSelect.value) > 5) quizCountSelect.value = '5';
+    document.getElementById('quiz-topic').disabled = !ai;
+}
+document.getElementById('quiz-source').addEventListener('change', updateQuizSource);
+if (quizCountSelect.options) updateQuizSource();

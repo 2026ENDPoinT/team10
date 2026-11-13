@@ -30,7 +30,7 @@
         <div><p class="eyebrow">AI 학습 파트너</p><strong>오늘은 무엇을 공부할까요?</strong></div>
         <button type="button" id="new-chat" class="secondary">새 대화</button>
       </header>
-      <div class="mode-banner">{% if mode == 'demo' %}데모 모드 · 예시 답변만 제공됩니다.{% elif not configured %}AI 연결 설정이 필요합니다. .env에 {{ 'GEMINI_API_KEY' if mode == 'gemini' else 'OPENAI_API_KEY' }}를 설정하고 다시 실행하세요. 성적·퀴즈 기능은 사용할 수 있습니다.{% else %}AI 학습 모드 · 질문과 첨부된 퀴즈 내용이 {{ 'Google Gemini' if mode == 'gemini' else 'OpenAI' }}로 전달됩니다.{% endif %}</div>
+      <div class="mode-banner">{% if mode == 'demo' %}데모 모드 · 예시 답변만 제공됩니다.{% elif not configured %}AI 연결 설정이 필요합니다. .env에 {{ key_name }}를 설정하고 다시 실행하세요. 성적·퀴즈 기능은 사용할 수 있습니다.{% else %}AI 학습 모드 · 질문과 첨부된 퀴즈 내용이 {{ provider_name }}로 전달됩니다.{% endif %}</div>
       <div id="messages" role="log" aria-live="polite" aria-relevant="additions">
         <article class="message assistant welcome"><span class="speaker">AI 학습 파트너</span><p>궁금한 질문이나 퀴즈 결과를 보내 주세요. 개념 설명, 추천 강의, 추가 연습을 도와드릴게요.</p></article>
       </div>

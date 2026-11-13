@@ -50,3 +50,33 @@ console.log('Actual team quiz checks passed: individual help, missed review, cor
 get('quiz-ai-analysis-btn').listeners.click();
 assert.equal(JSON.parse(stored.get('team10.studyQuizContext')).questions.length, 3);
 console.log('Full-result strength/review handoff passed.');
+
+(async () => {
+  get('quiz-source').value = 'ai';
+  get('quiz-count').value = '1';
+  get('quiz-topic').value = '입출력';
+  get('quiz-choices').querySelectorAll = () => [];
+  let calls = 0;
+  const question = {question: '입력 함수는?', choices: ['input()', 'print()', 'len()', 'int()'], answer: 0, explanation: 'input()은 입력을 받습니다.'};
+  sandbox.fetch = async (url, options) => {
+    calls++;
+    if (url.endsWith('generate')) return {ok: true, json: async () => ({quiz_id: 'test', questions: [{question: question.question, choices: question.choices}]})};
+    assert.equal(JSON.parse(options.body).answers[0], 1);
+    return {ok: true, json: async () => ({questions: [question], correct: 0})};
+  };
+  await vm.runInContext('startQuiz()', sandbox);
+  assert.equal(get('quiz-play').hidden, false);
+  assert.equal(vm.runInContext('quizQuestions[0].answer', sandbox), undefined);
+  vm.runInContext('userAnswers = [1]', sandbox);
+  await vm.runInContext('goNext()', sandbox);
+  assert.equal(get('quiz-result-score').textContent, '0 / 1');
+  get('quiz-ai-review-btn').listeners.click();
+  assert.equal(JSON.parse(stored.get('team10.studyQuizContext')).questions[0].explanation, question.explanation);
+  vm.runInContext('retryQuiz()', sandbox);
+  assert.equal(calls, 2);
+  assert.equal(get('quiz-play').hidden, false);
+  sandbox.fetch = async () => ({ok:false, json:async()=>({error:'사용 한도'})});
+  await vm.runInContext('startQuiz()', sandbox);
+  assert.equal(get('quiz-start-btn').disabled, false);
+  console.log('AI generation → server grading → tutor handoff and no-call retry passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

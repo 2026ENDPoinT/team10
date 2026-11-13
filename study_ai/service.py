@@ -98,11 +98,14 @@ def answer_question(payload, config):
                 query = '파이썬 정수 나눗셈 기초 강의'
             reply += '\nDemo video search uses a fixed Python division example; it is not personalized AI output.'
         return {'reply': reply, 'study_topic': 'Demo sample' if query else '', 'video_query': query}
+    if mode == 'groq':
+        from .groq import answer_groq
+        return answer_groq(payload, config)
     if mode == 'gemini':
         from .gemini import answer_gemini
         return answer_gemini(payload, config)
     if mode != 'openai':
-        raise TutorError('AI_MODE는 gemini, openai 또는 demo로 설정해 주세요.', 503)
+        raise TutorError('AI_MODE는 groq, gemini, openai 또는 demo로 설정해 주세요.', 503)
     if not config.get('OPENAI_API_KEY'):
         raise TutorError('Add OPENAI_API_KEY to the local .env file, then restart the server.', 503)
     try:

@@ -13,7 +13,9 @@ bp = Blueprint('study_ai', __name__, template_folder='templates',
 
 def init_study_ai(app):
     """Register this module without modifying existing quiz, score or DB routes."""
-    app.config.setdefault('AI_MODE', os.getenv('AI_MODE', 'gemini'))
+    app.config.setdefault('AI_MODE', os.getenv('AI_MODE', 'groq'))
+    app.config.setdefault('GROQ_API_KEY', os.getenv('GROQ_API_KEY', ''))
+    app.config.setdefault('GROQ_MODEL', os.getenv('GROQ_MODEL', 'openai/gpt-oss-120b'))
     app.config.setdefault('OPENAI_API_KEY', os.getenv('OPENAI_API_KEY', ''))
     app.config.setdefault('OPENAI_MODEL', os.getenv('OPENAI_MODEL', 'gpt-5.4-mini'))
     app.config.setdefault('YOUTUBE_API_KEY', os.getenv('YOUTUBE_API_KEY', ''))
@@ -31,14 +33,18 @@ def index():
         back_url = url_for(endpoint, **navigation)
     elif 'index' in current_app.view_functions:
         back_url = url_for('index')
-    return render_template('study_ai/chat.html', mode=current_app.config['AI_MODE'],
-                           configured=bool(current_app.config.get('GEMINI_API_KEY' if current_app.config['AI_MODE'] == 'gemini' else 'OPENAI_API_KEY')), back_url=back_url)
+    mode = current_app.config['AI_MODE']
+    key_name = {'groq': 'GROQ_API_KEY', 'gemini': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
+    return render_template('study_ai/chat.html', mode=mode, key_name=key_name,
+                           provider_name={'groq': 'Groq', 'gemini': 'Google Gemini', 'openai': 'OpenAI'}.get(mode, mode),
+                           configured=bool(current_app.config.get(key_name)), back_url=back_url)
 
 
 @bp.get('/api/health')
 def health():
     mode = current_app.config['AI_MODE']
-    ready = mode == 'demo' or (mode in ('openai', 'gemini') and bool(current_app.config.get('GEMINI_API_KEY' if mode == 'gemini' else 'OPENAI_API_KEY')))
+    key_name = {'groq': 'GROQ_API_KEY', 'gemini': 'GEMINI_API_KEY', 'openai': 'OPENAI_API_KEY'}.get(mode, '')
+    ready = mode == 'demo' or bool(current_app.config.get(key_name))
     return jsonify(mode=mode, configured=ready)
 
 

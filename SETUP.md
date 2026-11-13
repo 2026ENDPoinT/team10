@@ -1,5 +1,7 @@
 # Run the integrated Team 10 study app
 
+한국어 VS Code 설정 안내: [AI_SETUP_KO.md](AI_SETUP_KO.md)
+
 This is a separate source copy of your team project, with the AI module connected to the real quiz and score pages. The original GitHub folder has not been edited. The copy uses its own `data/database.db`; no student records or credentials were copied.
 
 ## Start on this computer
@@ -14,9 +16,9 @@ Keep the terminal/window open. After it says `Running on http://127.0.0.1:5002`,
 
 ## Real AI setup
 
-Copy `.env.example` to `.env` if the start script has not created it. In `.env`, fill in `GEMINI_API_KEY` with your Google AI Studio key and keep `AI_MODE=gemini`. Stop and restart the app after changing configuration. This version does not silently substitute demo replies when the key is missing: it shows a setup message.
+Copy `.env.example` to `.env` if the start script has not created it. In `.env`, fill in `GROQ_API_KEY` with your Groq key, set `AI_MODE=groq`, and set `GROQ_MODEL=openai/gpt-oss-120b`. Stop and restart the app after changing configuration. This version does not silently substitute demo replies when the key is missing: it shows a setup message.
 
-An optional `YOUTUBE_API_KEY` enables real video search results. Without it the tutor provides a topic-search link on YouTube. Keys stay in the local `.env`, which is ignored by Git. Do not put them in chat or browser code. Use a Free-tier Google AI Studio project for free-tier testing. Usage limits and model availability depend on the project. The app does not enable billing or automatically switch providers.
+An optional `YOUTUBE_API_KEY` enables real video search results. Without it the tutor provides a topic-search link on YouTube. Keys stay in the local `.env`, which is ignored by Git. Do not put them in chat or browser code. Use your Groq Free plan for this setup; usage limits and model availability depend on your account. The app does not enable billing or automatically switch providers.
 
 Official setup: [OpenAI](https://developers.openai.com/api/docs/quickstart), [YouTube](https://developers.google.com/youtube/v3/getting-started).
 
@@ -50,3 +52,14 @@ On this computer, if `py` cannot find Python:
 This is a local development copy, not a public deployment. Existing account/grade routes retain the team's prototype behavior. Public deployment needs authentication, per-user data access, rate limits, and usage controls.
 
 `SOURCE_SNAPSHOT.json` records hashes of the original files copied. `integration.patch` records the initial quiz/score UI changes and has ALREADY been applied to this copy. Do not apply it again here. Merge reviewed source changes on a team feature branch later; do not overwrite your team's database, `.env`, `.venv`, or Git history.
+
+Groq requests go to Groq, even though the model name starts with `openai/`. No OpenAI key is needed for this mode. Free account limits still apply; a limit error asks you to wait and never switches to a paid provider. Gemini remains available with `AI_MODE=gemini`.
+
+
+## AI 퀴즈 생성
+
+퀴즈 탭에서 **AI 새 문제**를 선택하고 `app.py` 교과과정의 과목과 1~5문제를 선택합니다. 학습 주제는 선택 입력입니다. 실제 강의계획서가 없으므로 일반적인 과목 내용을 기반으로 생성하며 AI 정답에 오류가 있을 수 있습니다.
+
+정답·해설은 별도 `data/ai_quizzes.db`에 저장됩니다. 제출 전에는 문제와 보기만 전달하고, 제출 후 Python이 채점하여 해설을 보여 줍니다. **같은 문제 다시 풀기**는 AI 재호출 없이 동작합니다. 결과에서 기존 학습파트너로 오답이나 전체 결과를 전달할 수 있습니다. 기존 문제은행 모드도 유지합니다.
+
+생성된 퀴즈는 현재 브라우저 세션에 연결되며 24시간 후 만료됩니다. 서버 재시작으로 세션이 변경되면 새로 생성해야 할 수 있습니다. 성공한 생성 후 15초 대기 제한과 Groq 자체 한도가 적용됩니다. 생성 토큰 사용량은 설정 영역에 표시됩니다. 공식 성적은 변경하지 않습니다.
