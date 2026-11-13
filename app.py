@@ -1,10 +1,29 @@
 import re
-from flask import Flask, render_template, request, redirect, url_for, flash
+import os
+import secrets
+from pathlib import Path
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from study_ai import init_study_ai
 from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 
+load_dotenv(Path(__file__).with_name('.env'))
 app = Flask(__name__)
-app.secret_key = 'super_secret_key'
+app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
+app.config.update(AI_MODE=os.getenv('AI_MODE', 'openai'), STUDY_BACK_ENDPOINT='scores',
+                  MAX_CONTENT_LENGTH=128 * 1024)
+init_study_ai(app)
+
+
+@app.before_request
+def remember_study_navigation():
+    # Local navigation only. Student identity is never added to AI requests.
+    if request.endpoint in ('scores', 'quiz'):
+        student_id = request.args.get('student_id', '')
+        if re.fullmatch(r'[1-9][0-9]{7}', student_id):
+            session['study_navigation'] = {'student_id': student_id,
+                'name': request.args.get('name', '')[:100], 'year': request.args.get('year', '')[:10]}
 
 init_db()
 
@@ -71,6 +90,19 @@ def scores():
                            curriculum=CURRICULUM,
                            course_credits=COURSE_CREDITS,
                            allowed_semesters=ALLOWED_SEMESTERS)
+
+@app.route('/quiz')
+def quiz():
+    # 학습 퀴즈 페이지 (학생 정보 유지)
+    student_id = request.args.get('student_id', '')
+    name = request.args.get('name', '')
+    year = request.args.get('year', '')
+
+    return render_template('quiz.html',
+                           student_id=student_id,
+                           name=name,
+                           year=year,
+                           curriculum=CURRICULUM) 
 
 @app.route('/add', methods=['POST'])
 def add():
@@ -176,4 +208,4 @@ def delete(course_id):
     return redirect(url_for('scores', student_id=student_id, name=name, year=year))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='127.0.0.1', port=int(os.getenv('PORT', '5002')), debug=False)

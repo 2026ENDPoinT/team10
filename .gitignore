@@ -1,3 +1,8 @@
-#Github에 올리지 않을 파일 지정
-# 프로젝트 전용 Python 환경을 Git 공유 대상에서 제외합니다.
 .venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.server.*
+data/
+*.db
