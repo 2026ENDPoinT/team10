@@ -1,17 +1,15 @@
-/*메인 페이지*/
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>대학생 성적 관리 프로그램 - 메인</title>
+    <title>대학생 성적 관리 프로그램 - 로그인</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container login-container">
         <h1>🎓 대학생 성적 관리 프로그램</h1>
-        <p class="desc">시작하려면 학번, 이름, 학년을 입력해주세요.</p>
+        <p class="desc">학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.<br>(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)</p>
 
-        <!-- 플래시 메시지 (학번 오류 알림 출력용) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flash-messages">
@@ -23,7 +21,7 @@
         {% endwith %}
 
         <div class="form-card">
-            <form action="{{ url_for('scores') }}" method="GET">
+            <form action="{{ url_for('login') }}" method="POST">
                 <div class="input-group" style="margin-bottom: 15px;">
                     <label for="student_id" style="display:block; margin-bottom:5px; font-weight:bold;">학번</label>
                     <input type="text" id="student_id" name="student_id" 
@@ -31,7 +29,6 @@
                            pattern="[1-9][0-9]{7}" 
                            maxlength="8" 
                            inputmode="numeric"
-                           title="0으로 시작하지 않는 8자리 숫자로 입력해주세요." 
                            required 
                            style="width:100%; padding:10px;">
                 </div>
@@ -41,7 +38,7 @@
                     <input type="text" id="name" name="name" placeholder="예: 김준호" required style="width:100%; padding:10px;">
                 </div>
 
-                <div class="input-group" style="margin-bottom: 20px;">
+                <div class="input-group" style="margin-bottom: 15px;">
                     <label for="year" style="display:block; margin-bottom:5px; font-weight:bold;">학년</label>
                     <select id="year" name="year" required style="width:100%; padding:10px;">
                         <option value="" disabled selected>학년을 선택하세요</option>
@@ -52,11 +49,40 @@
                     </select>
                 </div>
 
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label for="password" style="display:block; margin-bottom:5px; font-weight:bold;">비밀번호</label>
+                    <!-- 비밀번호 입력란과 보기 버튼을 감싸는 컨테이너 -->
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input type="password" id="password" name="password" 
+                               placeholder="특수문자(!@#$%^&*) 포함 필수" 
+                               required 
+                               style="width:100%; padding:10px; padding-right: 45px;">
+                        <button type="button" id="togglePassword" 
+                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 18px;" 
+                                title="비밀번호 표시/숨기기">(-)</button>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
-                    성적 입력 페이지로 이동
+                    로그인 및 성적 관리 시작
                 </button>
             </form>
         </div>
     </div>
+
+    <!-- 비밀번호 보기/숨기기 토글 스크립트 -->
+    <script>
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+
+        togglePassword.addEventListener('click', function () {
+            // input 타입이 password면 text로, text면 password로 전환
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // 아이콘 변경 (눈 모양 (-) / 가려진 눈 모양 (0))
+            this.textContent = type === 'password' ? '(-)' : '(0)';
+        });
+    </script>
 </body>
 </html>

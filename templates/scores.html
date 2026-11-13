@@ -11,7 +11,7 @@
         <div class="header-info">
             <h1>🎓 성적 관리 프로그램</h1>
             <p><strong>{{ year }}학년</strong> | 학번: <strong>{{ student_id }}</strong> | 이름: <strong>{{ name }}</strong>님 환영합니다!</p>
-            <a href="{{ url_for('index') }}" class="btn-back-main">처음 화면으로</a>
+            <a href="{{ url_for('logout') }}" class="btn-back-main" style="background-color: #dc3545;">로그아웃</a>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -30,16 +30,10 @@
             <p><strong>전체 등록 학점 수:</strong> {{ stats.total_credits }} 학점</p>
         </div>
 
-        <!-- 과목·성적 등록 -->
         <div class="form-card">
             <h2>📝 과목·성적 등록</h2>
             <form action="{{ url_for('add') }}" method="POST">
-                <input type="hidden" name="student_id" value="{{ student_id }}">
-                <input type="hidden" name="name" value="{{ name }}">
-                <input type="hidden" name="year" value="{{ year }}">
-
                 <div class="form-row">
-                    <!-- 과목명 선택 드롭다운 -->
                     <select name="name_input" id="course_select" required>
                         <option value="" disabled selected>과목 선택</option>
                         {% for sem, courses in curriculum.items() %}
@@ -51,7 +45,6 @@
                         {% endfor %}
                     </select>
 
-                    <!-- 수강 연도 선택 (2016~2036, 기본값 2026) -->
                     <select name="semester_year" required>
                         <option value="" disabled>연도 선택</option>
                         {% for y in range(2016, 2037) %}
@@ -59,7 +52,6 @@
                         {% endfor %}
                     </select>
 
-                    <!-- 수강 학기 선택 (여름학기, 1학기, 2학기, 겨울학기) -->
                     <select name="semester_term" required>
                         <option value="" disabled selected>학기 선택</option>
                         {% for term in allowed_semesters %}
@@ -67,10 +59,8 @@
                         {% endfor %}
                     </select>
                     
-                    <!-- 자동 입력 및 수정 불가 학점 필드 -->
                     <input type="number" name="credit" id="credit_input" placeholder="학점 (자동)" readonly required style="background-color: #e9ecef; cursor: not-allowed; width: 80px;">
 
-                    <!-- 성적 등급 선택 -->
                     <select name="grade" required>
                         <option value="" disabled selected>성적 등급</option>
                         {% for g in grades %}
@@ -107,11 +97,8 @@
                                     <td>{{ course.grade }}</td>
                                     <td>{{ course.point }}</td>
                                     <td>
-                                        <a href="{{ url_for('edit', course_id=course.id, student_id=student_id, name=name, year=year) }}" class="btn-edit">수정</a>
+                                        <a href="{{ url_for('edit', course_id=course.id) }}" class="btn-edit">수정</a>
                                         <form action="{{ url_for('delete', course_id=course.id) }}" method="POST" style="display:inline;">
-                                            <input type="hidden" name="student_id" value="{{ student_id }}">
-                                            <input type="hidden" name="name" value="{{ name }}">
-                                            <input type="hidden" name="year" value="{{ year }}">
                                             <button type="submit" class="btn-delete" onclick="return confirm('정말 삭제하시겠습니까?');">삭제</button>
                                         </form>
                                     </td>
