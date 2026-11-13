@@ -1,11 +1,16 @@
 import re
+from pathlib import Path
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash
 from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
+from study_ai.generated_quiz import init_generated_quiz
 
 
+load_dotenv(Path(__file__).with_name('.env'), override=True)
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 128 * 1024
 app.secret_key = 'super_secret_key'
 
 
@@ -48,6 +53,8 @@ CURRICULUM = {
 }
 
 ALLOWED_SEMESTERS = ["여름학기", "1학기", "2학기", "겨울학기"]
+
+init_generated_quiz(app, CURRICULUM)
 
 @app.route('/')
 def index():

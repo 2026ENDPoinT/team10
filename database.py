@@ -34,6 +34,12 @@ def init_db():
             point REAL NOT NULL
         )
     ''')
+    # CREATE TABLE IF NOT EXISTS does not upgrade an existing table.
+    columns = {row['name'] for row in conn.execute('PRAGMA table_info(courses)')}
+    if 'password' not in columns:
+        # Legacy rows have no known credential. Preserve them without assigning
+        # them to an arbitrary account; NULL will not match a login password.
+        conn.execute('ALTER TABLE courses ADD COLUMN password TEXT')
     conn.commit()
     conn.close()
 
