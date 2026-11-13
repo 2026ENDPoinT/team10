@@ -119,6 +119,9 @@ def save(item_id=None):
     except ValueError:
         flash('과목, 과제명(150자 이내), 마감 일시, 중요도를 확인해 주세요.', 'error')
         return redirect(url_for('.index'))
+    if deadline < now_kst():
+        flash('이미 지난 시간을 입력할 수 없습니다.', 'error')
+        return redirect(url_for('.index'))
     values = (subject, title, deadline.isoformat(timespec='minutes'), priority)
     conn = connection()
     try:
