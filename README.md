@@ -84,7 +84,7 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 
 | 테이블 | 내용 | 기존 위치 |
 |---|---|---|
-| `students` | 계정. `(student_id, password)` 조합이 하나의 성적 셋이므로, 같은 학번이라도 비밀번호가 다르면 별도의 데이터입니다. | `database.db` |
+| `students` | 계정. `id`(기본키), `student_id`(학번, UNIQUE), `password_hash`(비밀번호 해시), 이름, 학년 | `database.db` |
 | `courses` | 과목·학기·학점·등급·평점 | `database.db` |
 | `wrong_answers` | 퀴즈 오답 노트. 계정당 최근 10개, 같은 문제는 중복 없이 갱신됩니다. | `database.db` |
 | `chat_conversations` | AI 대화 기록. 계정당 최근 3개가 남습니다. | `database.db` |
@@ -92,23 +92,19 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 | `quizzes` | 생성된 AI 퀴즈의 정답·해설. 브라우저 세션에 연결되며 24시간 후 삭제됩니다. | `data/ai_quizzes.db` |
 
 - 앱은 Render가 발급하는 **Internal Database URL**을 환경 변수 `DATABASE_URL`로 받아 접속합니다.
-- 데이터 접근 규칙은 그대로입니다.
-  - 성적·오답·대화는 **학번과 비밀번호가 모두 일치할 때만** 조회하고 수정할 수 있습니다.
-  - 비밀번호를 바꾸면 과목·오답·대화가 새 비밀번호로 함께 옮겨집니다.
-  - 같은 학번의 다른 성적 셋이 이미 쓰는 비밀번호로는 바꿀 수 없습니다.
+- 테이블은 앱이 시작할 때 자동으로 만들어집니다(`database.py`의 `init_db()`). SQL을 따로 실행할 필요가 없습니다.
+- 계정과 데이터 접근 규칙
+  - 학번 하나에 계정 하나입니다. 처음 쓰는 학번으로 로그인하면 계정이 만들어지고, 이미 있는 학번은 비밀번호가 맞아야 로그인됩니다.
+  - 비밀번호는 해시(`werkzeug.security`)로만 저장하고, 세션 쿠키에는 넣지 않습니다(세션에는 `user_id`만).
+  - 성적·오답·대화·과제는 로그인한 계정(`user_id`)의 자료만 조회하고 수정할 수 있습니다. 비밀번호를 바꿔도 자료는 그대로 유지됩니다.
 
-### 현재 코드 상태와 전환 작업
+### 로컬 개발과 테스트
 
-> **현재 코드는 아직 SQLite(`sqlite3`)를 사용합니다.** Render Postgres로 저장하려면 아래 코드 변경이 필요합니다. 이 README는 전환 후의 구성을 기준으로 작성했습니다.
+모든 데이터 접근은 `database.py` 한 곳에서 합니다. SQL은 `?` 자리표시자로 작성하며, PostgreSQL에서는 자동으로 `%s`로 바뀝니다.
 
-| 파일 | 필요한 변경 |
-|---|---|
-| `requirements.txt` | `gunicorn`, `psycopg[binary]`(PostgreSQL 드라이버), `scipy`(예측 기능, 현재 누락) 추가 |
-| `database.py` | `sqlite3.connect('database.db')` → `DATABASE_URL`로 접속. SQL 자리표시자 `?` → `%s` |
-| `database.py` | SQLite 전용 문법 교체. `INTEGER PRIMARY KEY AUTOINCREMENT` → `SERIAL`/`GENERATED ... AS IDENTITY`, `cursor.lastrowid` → `INSERT ... RETURNING id`, `PRAGMA table_info` → `information_schema.columns` |
-| `database.py` | `get_student`가 SQLite의 숨은 열 `rowid`를 계정 id로 쓰므로 `students`에 `id` 열 추가. 과제 기능의 `assignment_owner`가 이 값을 사용합니다. |
-| `assignments.py`, `study_ai/generated_quiz.py` | 각자 여는 SQLite 파일(`data/assignments.db`, `data/ai_quizzes.db`) 대신 같은 Postgres에 접속 |
-| `tests/` | 테스트는 임시 SQLite를 쓰도록 되어 있으므로 테스트용 DB 접속 방식 정리 |
+- `DATABASE_URL`이 **없으면** `data/database.db` SQLite 파일을 씁니다. 노트북에서는 지금처럼 설치 없이 실행됩니다. `data/`는 `.gitignore`에 있어 커밋되지 않습니다.
+- 예전 구조(평문 비밀번호)의 로컬 SQLite 테이블은 지우지 않고 `legacy_*` 이름으로 보관합니다.
+- 테스트는 임시 SQLite로 돌고, `TEST_DATABASE_URL`을 주면 그 PostgreSQL로 돕니다. 테이블을 비우므로 운영 DB 주소를 넣으면 안 됩니다.
 
 ### 무료 Postgres 주의 사항
 

@@ -1,26 +1,29 @@
 import json
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch
+import database
 from app import app
 from assignments import connection, planning_context
+from db_helper import make_students, use_test_database
 
 
 class PlanningTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.old = dict(app.config)
-        app.config.update(TESTING=True, ASSIGNMENTS_DB=str(Path(self.temp.name)/'tasks.db'))
+        use_test_database(self, self.temp.name)
+        make_students(2)
+        app.config.update(TESTING=True)
         self.clock = patch('assignments.now_kst',return_value=datetime(2026,11,14,12))
         self.clock.start()
         self.client = app.test_client()
         with self.client.session_transaction() as session:
             session.update(assignment_owner=1,assignment_csrf='test',
                 assignment_navigation={'student_id':'12345678','name':'Test','year':'1'},
-                student_id='12345678',name='Test',year='1',password='test!')
+                user_id=1,student_id='12345678',name='Test',year='1')
 
     def tearDown(self):
         self.clock.stop()
@@ -75,15 +78,16 @@ class PlanningTests(unittest.TestCase):
         self.save(estimated_hours='-1')
         with app.app_context():
             conn=connection()
-            self.assertEqual(conn.execute('SELECT COUNT(*) FROM assignments').fetchone()[0],1)
+            self.assertEqual(conn.execute('SELECT COUNT(*) AS n FROM assignments').fetchone()['n'],1)
             conn.close()
 
-    def test_legacy_migration_and_repeated_initialization(self):
-        conn=sqlite3.connect(app.config['ASSIGNMENTS_DB'])
-        conn.execute('CREATE TABLE assignments(id INTEGER PRIMARY KEY,owner INTEGER,subject TEXT,title TEXT,deadline TEXT,priority INTEGER,completed INTEGER)')
-        conn.execute("INSERT INTO assignments VALUES(1,1,'Course','Original','2026-11-15T18:00',2,0)")
-        conn.commit()
-        conn.close()
+    def test_repeated_initialization_keeps_data_and_defaults(self):
+        with app.app_context():
+            conn=connection()
+            with conn:
+                conn.execute("INSERT INTO assignments(owner,subject,title,deadline,priority) VALUES(1,'Course','Original','2026-11-15T18:00',2)")
+            conn.close()
+        database.init_db()
         self.assertEqual(self.row()['title'],'Original')
         self.assertEqual(self.row()['estimated_minutes'],0)
         self.assertEqual(json.loads(self.row()['checklist']),[])

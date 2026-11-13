@@ -3,8 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-import database
 from app import app
+from db_helper import use_test_database
 from assignments import notice, label, connection
 
 
@@ -12,10 +12,8 @@ class AssignmentTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.old = dict(app.config)
-        self.old_db = database.DB_NAME
-        database.DB_NAME = str(Path(self.folder.name) / 'grades.db')
-        database.init_db()
-        app.config.update(TESTING=True, ASSIGNMENTS_DB=str(Path(self.folder.name) / 'tasks.db'))
+        use_test_database(self, self.folder.name)
+        app.config.update(TESTING=True)
         self.client = app.test_client()
         response = self.client.post('/login', data={'student_id':'12345678','name':'Test','year':'1','password':'test!'})
         self.assertEqual(response.status_code,302)
@@ -24,7 +22,6 @@ class AssignmentTests(unittest.TestCase):
             self.token = session['assignment_csrf']
 
     def tearDown(self):
-        database.DB_NAME = self.old_db
         app.config.clear()
         app.config.update(self.old)
         self.folder.cleanup()
@@ -37,7 +34,7 @@ class AssignmentTests(unittest.TestCase):
         self.assertEqual(self.create().status_code,302)
         self.assertIn('과제', self.client.get('/assignments/').get_data(as_text=True))
         other = app.test_client()
-        other.post('/login', data={'student_id':'12345678','name':'Other','year':'1','password':'other!'})
+        other.post('/login', data={'student_id':'87654321','name':'Other','year':'1','password':'other!'})
         other.get('/assignments/')
         with other.session_transaction() as s:
             token = s['assignment_csrf']
@@ -48,7 +45,7 @@ class AssignmentTests(unittest.TestCase):
             self.client.post('/assignments/1/'+action,data={'csrf_token':self.token})
             with app.app_context():
                 c=connection()
-                self.assertEqual(c.execute('SELECT completed FROM assignments').fetchone()[0],expected)
+                self.assertEqual(c.execute('SELECT completed FROM assignments').fetchone()['completed'],expected)
                 c.close()
         self.client.post('/assignments/1/save', data={'csrf_token':self.token,'subject':'선형대수학',
             'title':'수정된 과제','deadline':'2026-11-16T12:00','priority':3})
@@ -80,7 +77,7 @@ class AssignmentTests(unittest.TestCase):
         self.client.post('/assignments/save', data=data)
         with app.app_context():
             c = connection()
-            self.assertEqual(c.execute('SELECT deadline FROM assignments').fetchone()[0], '2028-02-29T00:05')
+            self.assertEqual(c.execute('SELECT deadline FROM assignments').fetchone()['deadline'], '2028-02-29T00:05')
             c.close()
         page = self.client.get('/assignments/').get_data(as_text=True)
         self.assertIn('name="deadline_year"', page)
@@ -92,7 +89,7 @@ class AssignmentTests(unittest.TestCase):
         self.client.post('/assignments/1/save', data=data)
         with app.app_context():
             c = connection()
-            self.assertEqual(c.execute('SELECT deadline FROM assignments').fetchone()[0], '2028-02-29T00:05')
+            self.assertEqual(c.execute('SELECT deadline FROM assignments').fetchone()['deadline'], '2028-02-29T00:05')
             c.close()
 
     def test_login_required_and_validation(self):
@@ -100,5 +97,5 @@ class AssignmentTests(unittest.TestCase):
         self.create('invalid','bad date')
         with app.app_context():
             c=connection()
-            self.assertEqual(c.execute('SELECT COUNT(*) FROM assignments').fetchone()[0],0)
+            self.assertEqual(c.execute('SELECT COUNT(*) AS n FROM assignments').fetchone()['n'],0)
             c.close()
