@@ -1,0 +1,29 @@
+{#
+  [신규 파일] 상단 다이나믹 아일랜드 (scores.html / quiz.html 공통)
+  - 사용법: 각 페이지 상단에서 active_page 를 지정한 뒤 include
+      {% set active_page = 'scores' %}   (또는 'quiz')
+      {% include '_island.html' %}
+  - 사용 변수: student_id, name, year (app.py 에서 이미 전달 중 / KEY.md 참고)
+  - 디자인 참고 이미지: 스크린샷_2026-11-13_180001.png (상단 둥근 알약 형태 메뉴바)
+    · "오늘" 버튼 자리 -> QUIZ 버튼 / "로그인" 자리 -> 학적 정보(학번·이름·학년)
+  - 추가로 사용한 이미지 없음 (아이콘은 모두 이모지)
+#}
+<div class="island-wrap">
+    <nav class="island" id="island">
+        <span class="island-logo">🎓</span>
+
+        <a class="island-btn {% if active_page == 'quiz' %}active{% endif %}"
+           href="{{ url_for('quiz', student_id=student_id, name=name, year=year) }}">🧠 QUIZ</a>
+        <a class="island-btn {% if active_page == 'scores' %}active{% endif %}"
+           href="{{ url_for('scores', student_id=student_id, name=name, year=year) }}">📊 성적</a>
+
+        <span class="island-divider"></span>
+
+        <div class="island-profile" title="현재 로그인한 학적 정보">
+            <span class="island-avatar">{{ name[:1] }}</span>
+            <span class="island-profile-text">{{ year }}학년 · {{ student_id }} · {{ name }}</span>
+        </div>
+
+        <a class="island-home" href="{{ url_for('index') }}" title="처음 화면으로">🏠</a>
+    </nav>
+</div>
