@@ -10,7 +10,7 @@ from scipy.stats import norm
 
 from database import init_db, get_all_courses, get_course_by_id, add_course, update_course, delete_course, save_or_update_student, get_student, update_student_password
 from gpa_calculator import GRADE_POINTS, calculate_gpa
-from study_ai import init_study_ai  # [추가] AI 튜터 모듈 임포트
+from study_ai import init_study_ai  
 from study_ai.generated_quiz import init_generated_quiz
 from assignments import init_assignments
 
@@ -22,7 +22,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY') or secrets.token_hex(32)
 
 
 init_db()
-init_study_ai(app)  # [추가] AI 튜터 블루프린트 등록
+init_study_ai(app)  
 
 COURSE_CREDITS = {
     "프로그래밍입문(1)": 3, "Introduction to Programming 1": 3,
@@ -198,29 +198,48 @@ def predict():
                 return int(val)
 
             total_students = get_int('total_students', 40)
+            if total_students <= 0:
+                flash('수강 인원은 0을 포함하지 않는 양수여야 합니다.', 'error')
+                return redirect(url_for('predict'))
+
+            max_score = get_float('max_score', 100)
+            if max_score <= 0:
+                flash('중간고사 최고 점수는 0보다 커야 합니다.', 'error')
+                return redirect(url_for('predict'))
+
             my_mid = get_float('my_mid', 0)
+            if not (0 <= my_mid <= max_score):
+                flash(f'내 중간고사 점수는 0부터 {max_score} 사이의 숫자만 입력할 수 있습니다.', 'error')
+                return redirect(url_for('predict'))
+
             mid_mean = get_float('mid_mean', 0)
+            if not (0 <= mid_mean <= max_score):
+                flash(f'중간고사 평균은 0부터 {max_score} 사이의 숫자만 입력할 수 있습니다.', 'error')
+                return redirect(url_for('predict'))
+
             mid_std = get_float('mid_std', 10)
-            if mid_std <= 0: mid_std = 1.0
+            if not (0 <= mid_std <= 100):
+                flash('중간고사 표준편차는 0부터 100 사이의 숫자만 입력할 수 있습니다.', 'error')
+                return redirect(url_for('predict'))
+            if mid_std == 0: 
+                mid_std = 1.0  
             
             mid_weight = get_float('mid_weight', 40)
             final_weight = get_float('final_weight', 40)
+
+            if mid_weight + final_weight > 100:
+                flash('중간 반영과 기말 반영의 합이 100을 초과합니다. 비율을 제대로 적어주세요.', 'error')
+                return redirect(url_for('predict'))
+
             target_grade = request.form.get('target_grade', 'A+')
 
-            r_aplus = get_float('r_aplus', 10)
-            r_azero = get_float('r_azero', 20)
-            r_bplus = get_float('r_bplus', 20)
-            r_bzero = get_float('r_bzero', 20)
-            r_cplus = get_float('r_cplus', 15)
-            r_czero = get_float('r_czero', 15)
-
             cumulative_pcts = {
-                'A+': r_aplus,
-                'A0': r_aplus + r_azero,
-                'B+': r_aplus + r_azero + r_bplus,
-                'B0': r_aplus + r_azero + r_bplus + r_bzero,
-                'C+': r_aplus + r_azero + r_bplus + r_bzero + r_cplus,
-                'C0': r_aplus + r_azero + r_bplus + r_bzero + r_cplus + r_czero
+                'A+': 10.0,
+                'A0': 30.0,
+                'B+': 50.0,
+                'B0': 70.0,
+                'C+': 85.0,
+                'C0': 100.0
             }
 
             target_pct = cumulative_pcts.get(target_grade, 30.0)
@@ -240,6 +259,9 @@ def predict():
                 z_final = 0.0
 
             required_final_score = mid_mean + (z_final * mid_std)
+            # 0점 이하일 경우 0점으로 보정
+            required_final_score = max(0.0, required_final_score)
+
             final_cdf = norm.cdf(z_final)
             required_final_rank_ratio = max(0.0, min(1.0, 1.0 - final_cdf))
             required_final_rank = max(1, min(total_students, math.ceil(total_students * required_final_rank_ratio)))
@@ -264,7 +286,6 @@ def predict():
 
 @app.route('/quiz')
 def quiz():
-
     student_id = session.get('student_id', '')
     name = session.get('name', '')
     year = session.get('year', '')
@@ -350,7 +371,6 @@ def edit(course_id):
     if not course or course['student_id'] != student_id or course['password'] != session['password']:
         flash('존재하지 않거나 권한이 없는 과목입니다.', 'error')
         return redirect(url_for('manage'))
-
 
     curr_year = "2026"
     curr_term = "1학기"

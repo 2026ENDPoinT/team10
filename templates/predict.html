@@ -32,7 +32,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:5px;">수강 인원 (명)</label>
-                        <input type="number" name="total_students" value="40" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                        <input type="number" name="total_students" value="40" min="1" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;" placeholder="0 포함 불가 (양수)">
                     </div>
                     <div>
                         <label style="display:block; font-weight:bold; margin-bottom:5px;">목표 등급</label>
@@ -50,58 +50,51 @@
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">내 중간고사 점수</label>
-                        <input type="number" step="0.1" name="my_mid" value="85.5" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 최고 점수</label>
+                        <input type="number" step="0.1" id="max_score" name="max_score" value="100" min="1" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                     </div>
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 평균</label>
-                        <input type="number" step="0.1" name="mid_mean" value="75.5" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">내 중간고사 점수</label>
+                        <input type="number" step="0.1" id="my_mid" name="my_mid" value="85.5" min="0" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;" placeholder="0 이상 최고 점수 이하">
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 표준편차</label>
-                        <input type="number" step="0.1" name="mid_std" value="10.5" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 평균</label>
+                        <input type="number" step="0.1" id="mid_mean" name="mid_mean" value="75.5" min="0" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;" placeholder="0 이상 최고 점수 이하">
                     </div>
-                    <div style="display: flex; gap: 10px;">
-                        <div style="flex: 1;">
-                            <label style="display:block; font-weight:bold; margin-bottom:5px;">중간 반영(%)</label>
-                            <input type="number" name="mid_weight" value="40" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                    <div>
+                        <label style="display:block; font-weight:bold; margin-bottom:5px;">중간고사 표준편차 (0~100)</label>
+                        <input type="number" step="0.1" name="mid_std" value="10.5" min="0" max="100" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;" placeholder="0~100 사이 입력">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div style="grid-column: span 2; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label style="display:block; font-weight:bold; margin-bottom:5px; font-size: 13px;">중간 반영(%)</label>
+                            <input type="number" id="mid_weight" name="mid_weight" value="40" min="0" max="100" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
                         </div>
-                        <div style="flex: 1;">
-                            <label style="display:block; font-weight:bold; margin-bottom:5px;">기말 반영(%)</label>
-                            <input type="number" name="final_weight" value="40" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                        <div>
+                            <label style="display:block; font-weight:bold; margin-bottom:5px; font-size: 13px;">기말 반영(%)</label>
+                            <input type="number" id="final_weight" name="final_weight" value="40" min="0" max="100" required style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-weight:bold; margin-bottom:5px; font-size: 13px;">기타 반영(%)</label>
+                            <input type="number" id="other_weight" name="other_weight" value="20" readonly style="width:100%; padding:10px; border:1px solid #ccc; border-radius:4px; background-color: #e9ecef;" title="100 - 중간 반영 - 기말 반영">
                         </div>
                     </div>
                 </div>
 
-                <h4 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">📊 상대평가 세부 등급별 비율 설정 (%)</h4>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">A+ 비율 (%)</label>
-                        <input type="number" step="0.1" name="r_aplus" value="10" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">A0 비율 (%)</label>
-                        <input type="number" step="0.1" name="r_azero" value="20" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">B+ 비율 (%)</label>
-                        <input type="number" step="0.1" name="r_bplus" value="20" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">B0 비율 (%)</label>
-                        <input type="number" step="0.1" name="r_bzero" value="20" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">C+ 비율 (%)</label>
-                        <input type="number" step="0.1" name="r_cplus" value="15" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-weight:bold; margin-bottom:5px;">C0 비율 (%)</label>
-                        <input type="number" step="0.1" name="r_czero" value="15" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-                    </div>
+                <h4 style="margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">📊 상대평가 등급별 누적 비율 (고정)</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; color: #495057; border: 1px solid #dee2e6;">
+                    <p style="margin: 0 0 5px 0;">• <strong>A+</strong>: 상위 10%</p>
+                    <p style="margin: 0 0 5px 0; color: #0056b3; font-weight: bold;">• <strong>A0 이상</strong>: 상위 30% 이하</p>
+                    <p style="margin: 0 0 5px 0;">• <strong>B+</strong>: 상위 50%</p>
+                    <p style="margin: 0 0 5px 0; color: #0056b3; font-weight: bold;">• <strong>B0 이상</strong>: 상위 70% 이하</p>
+                    <p style="margin: 0 0 5px 0;">• <strong>C+</strong>: 상위 85%</p>
+                    <p style="margin: 0;">• <strong>C0 이상</strong>: 상위 100% 이하</p>
                 </div>
 
                 <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer; font-weight:bold;">
@@ -130,5 +123,41 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+        const midWeightInput = document.getElementById('mid_weight');
+        const finalWeightInput = document.getElementById('final_weight');
+        const otherWeightInput = document.getElementById('other_weight');
+        const maxScoreInput = document.getElementById('max_score');
+        const myMidInput = document.getElementById('my_mid');
+        const midMeanInput = document.getElementById('mid_mean');
+
+        function updateOtherWeight() {
+            const mid = parseFloat(midWeightInput.value) || 0;
+            const final = parseFloat(finalWeightInput.value) || 0;
+            const other = 100 - mid - final;
+            otherWeightInput.value = other;
+            if (other < 0) {
+                otherWeightInput.style.color = 'red';
+                otherWeightInput.style.fontWeight = 'bold';
+            } else {
+                otherWeightInput.style.color = '#333';
+                otherWeightInput.style.fontWeight = 'normal';
+            }
+        }
+
+        function updateMaxScoreLimit() {
+            const maxVal = maxScoreInput.value;
+            myMidInput.max = maxVal;
+            midMeanInput.max = maxVal;
+        }
+
+        midWeightInput.addEventListener('input', updateOtherWeight);
+        finalWeightInput.addEventListener('input', updateOtherWeight);
+        maxScoreInput.addEventListener('input', updateMaxScoreLimit);
+
+        updateOtherWeight();
+        updateMaxScoreLimit();
+    </script>
 </body>
 </html>
