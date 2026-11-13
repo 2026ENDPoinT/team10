@@ -46,7 +46,6 @@
             </div>
         </div>
 
-        <button type="button" id="openPasswordModal" class="island-btn ghost" title="{{ t('비밀번호 변경') }}"><span aria-hidden="true">🔑</span><span class="island-label">{{ t('비번변경') }}</span></button>
         {% else %}
         <span class="island-divider"></span>
         <a class="island-btn active" href="{{ url_for('index') }}#login"><span aria-hidden="true">🔐</span><span class="island-label">{{ t('로그인') }}</span></a>
@@ -84,7 +83,7 @@
 
         const modal = document.getElementById('passwordModal');
         if (!modal) return;
-        document.querySelectorAll('#openPasswordModal, [data-open-password]').forEach((btn) =>
+        document.querySelectorAll('[data-open-password]').forEach((btn) =>
             btn.addEventListener('click', () => modal.classList.add('open')));
         document.getElementById('closePasswordModal').addEventListener('click', () => modal.classList.remove('open'));
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });

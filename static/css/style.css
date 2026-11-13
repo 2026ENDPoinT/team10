@@ -1279,8 +1279,7 @@ tbody tr:hover td { background: #fafcff; }
     .island { gap: 0; padding: 5px; }
     .island-btn { padding: 8px 5px; }
     .island-avatar { width: 32px; height: 32px; margin: 0 2px; }
-    .island-divider,
-    #openPasswordModal { display: none; }   /* 좁은 화면: 비번변경은 프로필 카드 안 버튼으로 */
+    .island-divider { display: none; }
     .site-language-option { padding: 5px 6px; font-size: 11px; }
     .island-profile-card { left: auto; right: -60px; transform: translateY(-6px); }
     .island-profile:hover .island-profile-card,
