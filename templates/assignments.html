@@ -47,6 +47,7 @@
         </select></label>
         <label>{{ t('시간') }}<input type="time" name="deadline_time" required step="60" value="{{ saved[11:16] if saved else '' }}"></label>
       </div>
+      <p class="deadline-error" role="alert" hidden style="color:#b42318;margin:8px 0 0;font-size:14px"></p>
     </fieldset>
     <label>{{ t('중요도') }}<select name="priority">{% for value,text in [(3,'높음'),(2,'보통'),(1,'낮음')] %}
       <option value="{{ value }}" {% if (item and item.priority == value) or (not item and value == 2) %}selected{% endif %}>{{ text |ui_text }}</option>
