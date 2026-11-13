@@ -17,6 +17,7 @@
         <a class="island-btn {% if active_page == 'scores' %}active{% endif %}"
            href="{{ url_for('scores', student_id=student_id, name=name, year=year) }}">📊 성적</a>
 
+        <a class="island-btn {% if active_page == 'assignments' %}active{% endif %}" href="{{ url_for('assignments.index') }}">📅 과제</a>
         <span class="island-divider"></span>
 
         <div class="island-profile" title="현재 로그인한 학적 정보">

@@ -1,0 +1,13 @@
+const assert = require('node:assert/strict');
+const {assignmentCountdown: label} = require('../static/js/assignment-countdown.js');
+const deadline = '2026-11-13T10:20+09:00';
+const at = value => Date.parse(value + '+09:00');
+assert.equal(label(deadline, at('2026-11-13T10:00')), '오늘 마감 · 20분 후 마감');
+assert.equal(label(deadline, at('2026-11-13T08:10')), '오늘 마감 · 2시간 10분 후 마감');
+assert.equal(label(deadline, at('2026-11-13T09:20')), '오늘 마감 · 1시간 후 마감');
+assert.equal(label(deadline, at('2026-11-13T10:19:30')), '오늘 마감 · 1분 이내 마감');
+assert.equal(label(deadline, at('2026-11-13T10:20')), '오늘 마감 · 마감 시간이 지났어요');
+assert.equal(label(deadline, at('2026-11-12T23:59')), 'D-1');
+assert.equal(label(deadline, at('2026-11-14T00:00')), '마감 1일 지남');
+assert.equal(label('2026-12-01T00:20+09:00', at('2026-12-01T00:00')), '오늘 마감 · 20분 후 마감');
+console.log('Countdown: minute/hour display, deadline boundary, and Korean midnight passed.');
