@@ -67,22 +67,107 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 
 ---
 
-## 데이터 저장
+## 데이터 저장 (Render)
 
-모든 데이터는 SQLite로 저장됩니다. DB 파일은 `.gitignore`에 포함되어 있어 커밋되지 않습니다.
+배포 환경에서는 로컬 `.db` 파일 대신 **Render 무료 플랜**을 사용합니다.
 
-| 파일 | 테이블 | 내용 |
+| 구성 요소 | Render 서비스 | 역할 |
 |---|---|---|
-| `database.db` (실행 위치) | `students` | 계정. 기본키가 `(student_id, password)`이므로 같은 학번이라도 비밀번호가 다르면 별도의 성적 셋입니다. |
-| | `courses` | 과목·학기·학점·등급·평점 |
-| | `wrong_answers` | 퀴즈 오답 노트. 계정당 최근 10개, 같은 문제는 중복 없이 갱신됩니다. |
-| | `chat_conversations` | AI 대화 기록. 계정당 최근 3개가 남습니다. |
-| `data/assignments.db` | `assignments` | 과제, 체크리스트, 예상 시간 |
-| `data/ai_quizzes.db` | `quizzes` | 생성된 AI 퀴즈의 정답·해설. 브라우저 세션에 연결되며 24시간 후 삭제됩니다. |
+| 웹 서버 | **Web Service (Free)** | Flask 앱을 `gunicorn`으로 실행합니다. GitHub 저장소와 연결되어 push할 때마다 자동 배포됩니다. |
+| 데이터베이스 | **Render Postgres (Free)** | 계정·성적·오답·대화·과제·AI 퀴즈를 PostgreSQL 데이터베이스 하나에 저장합니다. |
 
-- 성적·오답·대화는 **학번과 비밀번호가 모두 일치할 때만** 조회하고 수정할 수 있습니다.
-- 비밀번호를 바꾸면 과목·오답·대화가 새 비밀번호로 함께 옮겨집니다.
-- 같은 학번의 다른 성적 셋이 이미 쓰는 비밀번호로는 바꿀 수 없습니다.
+**SQLite 파일을 쓰지 않는 이유:** Render 무료 Web Service의 파일 시스템은 임시 저장소입니다. 재배포·재시작·휴면(spin-down) 때 서버에 만든 파일이 모두 사라지고, 무료 플랜에서는 영구 디스크(Persistent Disk)를 붙일 수 없습니다. 그래서 `database.db`나 `data/*.db`에 저장하면 데이터가 유지되지 않습니다.
+
+### 테이블
+
+무료 Postgres는 워크스페이스당 1개만 만들 수 있으므로, 기존 DB 파일 3개의 테이블을 데이터베이스 하나에 모읍니다.
+
+| 테이블 | 내용 | 기존 위치 |
+|---|---|---|
+| `students` | 계정. `(student_id, password)` 조합이 하나의 성적 셋이므로, 같은 학번이라도 비밀번호가 다르면 별도의 데이터입니다. | `database.db` |
+| `courses` | 과목·학기·학점·등급·평점 | `database.db` |
+| `wrong_answers` | 퀴즈 오답 노트. 계정당 최근 10개, 같은 문제는 중복 없이 갱신됩니다. | `database.db` |
+| `chat_conversations` | AI 대화 기록. 계정당 최근 3개가 남습니다. | `database.db` |
+| `assignments` | 과제, 체크리스트, 예상 시간 | `data/assignments.db` |
+| `quizzes` | 생성된 AI 퀴즈의 정답·해설. 브라우저 세션에 연결되며 24시간 후 삭제됩니다. | `data/ai_quizzes.db` |
+
+- 앱은 Render가 발급하는 **Internal Database URL**을 환경 변수 `DATABASE_URL`로 받아 접속합니다.
+- 데이터 접근 규칙은 그대로입니다.
+  - 성적·오답·대화는 **학번과 비밀번호가 모두 일치할 때만** 조회하고 수정할 수 있습니다.
+  - 비밀번호를 바꾸면 과목·오답·대화가 새 비밀번호로 함께 옮겨집니다.
+  - 같은 학번의 다른 성적 셋이 이미 쓰는 비밀번호로는 바꿀 수 없습니다.
+
+### 현재 코드 상태와 전환 작업
+
+> **현재 코드는 아직 SQLite(`sqlite3`)를 사용합니다.** Render Postgres로 저장하려면 아래 코드 변경이 필요합니다. 이 README는 전환 후의 구성을 기준으로 작성했습니다.
+
+| 파일 | 필요한 변경 |
+|---|---|
+| `requirements.txt` | `gunicorn`, `psycopg[binary]`(PostgreSQL 드라이버), `scipy`(예측 기능, 현재 누락) 추가 |
+| `database.py` | `sqlite3.connect('database.db')` → `DATABASE_URL`로 접속. SQL 자리표시자 `?` → `%s` |
+| `database.py` | SQLite 전용 문법 교체. `INTEGER PRIMARY KEY AUTOINCREMENT` → `SERIAL`/`GENERATED ... AS IDENTITY`, `cursor.lastrowid` → `INSERT ... RETURNING id`, `PRAGMA table_info` → `information_schema.columns` |
+| `database.py` | `get_student`가 SQLite의 숨은 열 `rowid`를 계정 id로 쓰므로 `students`에 `id` 열 추가. 과제 기능의 `assignment_owner`가 이 값을 사용합니다. |
+| `assignments.py`, `study_ai/generated_quiz.py` | 각자 여는 SQLite 파일(`data/assignments.db`, `data/ai_quizzes.db`) 대신 같은 Postgres에 접속 |
+| `tests/` | 테스트는 임시 SQLite를 쓰도록 되어 있으므로 테스트용 DB 접속 방식 정리 |
+
+### 무료 Postgres 주의 사항
+
+- **만료:** 무료 데이터베이스는 **생성 후 30일**이 지나면 만료되어 접속할 수 없습니다. 만료 후 **14일 안에** 유료 플랜으로 올리지 않으면 데이터와 함께 삭제됩니다.
+- **백업:** 시연이나 제출 일정에 맞춰 만들고, 필요하면 만료 전에 백업합니다(`pg_dump` 또는 Render 대시보드의 백업 기능).
+- **용량:** 저장 용량은 **1GB** 고정입니다.
+
+---
+
+## Render 배포 방법
+
+### 1. 데이터베이스 만들기
+
+1. [Render 대시보드](https://dashboard.render.com)에서 **New → Postgres**를 선택합니다.
+2. 이름을 정하고 Instance Type을 **Free**로 선택한 뒤 만듭니다.
+3. 데이터베이스 화면의 **Connections**에서 **Internal Database URL**을 복사합니다. 같은 Render 지역의 서비스끼리 연결할 때 사용하는 주소입니다.
+
+### 2. 웹 서비스 만들기
+
+**New → Web Service**에서 이 GitHub 저장소를 연결하고 다음과 같이 설정합니다.
+
+| 항목 | 값 |
+|---|---|
+| Language | Python 3 |
+| Branch | 배포할 브랜치 (예: `main`) |
+| Region | 데이터베이스와 같은 지역 |
+| Build Command | `pip install -r requirements.txt` |
+| Start Command | `gunicorn app:app` |
+| Instance Type | **Free** |
+
+`gunicorn app:app`은 `app.py`의 `app` 객체를 실행합니다. `app.run(debug=True)`는 직접 `python app.py`로 실행할 때만 동작하므로, Render에서는 디버그 모드가 켜지지 않습니다.
+
+### 3. 환경 변수 설정
+
+`.env` 파일은 Git에 올리지 않으므로 Render에 올라가지 않습니다. 웹 서비스의 **Environment** 탭에 직접 입력합니다.
+
+| 변수 | 값 |
+|---|---|
+| `DATABASE_URL` | 1단계에서 복사한 Internal Database URL |
+| `FLASK_SECRET_KEY` | **필수.** 긴 임의 문자열. 비워 두면 재시작·휴면 때마다 모두 로그아웃되고, gunicorn 작업 프로세스마다 키가 달라져 로그인이 풀릴 수 있습니다. |
+| `AI_MODE`, `GROQ_API_KEY`, `GROQ_MODEL` | AI 기능 설정 (위 `.env` 설정 표와 같음) |
+| `YOUTUBE_API_KEY` | 선택 사항 |
+| `PYTHON_VERSION` | Render에서 쓸 Python 버전. 지원 버전은 [Render 문서](https://render.com/docs/python-version)를 확인합니다. |
+
+### 4. 배포와 접속
+
+- 저장하면 빌드와 배포가 시작됩니다. 완료 후 `https://<서비스 이름>.onrender.com`으로 접속합니다.
+- 연결된 브랜치에 push하면 자동으로 다시 배포됩니다.
+
+### 무료 Web Service 동작
+
+| 항목 | 내용 |
+|---|---|
+| 휴면 | 요청이 **15분** 동안 없으면 서버가 멈춥니다. |
+| 첫 접속 지연 | 휴면 후 첫 요청 때 다시 켜지는 데 **약 1분**이 걸리며, 그동안 로딩 화면이 보입니다. 시연 전에 미리 한 번 접속해 두세요. |
+| 사용 시간 | 워크스페이스당 매월 **750시간**. 다 쓰면 다음 달까지 무료 서비스가 정지됩니다. |
+| 파일 저장 | 임시 저장소라 재배포·재시작·휴면 때 사라집니다. 데이터는 반드시 Postgres에 저장합니다. |
+
+무료 플랜의 정확한 조건은 [Render 무료 플랜 문서](https://render.com/docs/free)를 확인하세요. 위 내용은 2026년 11월 기준입니다.
 
 ---
 
@@ -91,7 +176,7 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 ```
 team10/
 ├── app.py                  # Flask 앱: 로그인, 성적·관리·예측·퀴즈 라우트, 비밀번호 규칙, 교과과정(CURRICULUM)
-├── database.py             # SQLite: 계정·과목·오답 노트·AI 대화 저장
+├── database.py             # 계정·과목·오답 노트·AI 대화 저장 (현재 SQLite → Render Postgres 전환 대상)
 ├── gpa_calculator.py       # 등급별 평점(GRADE_POINTS)과 전체·학기별 평점 계산
 ├── assignments.py          # 과제 관리 블루프린트 (/assignments/)
 ├── study_records.py        # 오답 노트·AI 대화 저장 API (/api/...)
@@ -115,9 +200,10 @@ team10/
 │   ├── js/                 # main.js(그래프), quiz.js, language.js, assignment-*.js
 │   └── translations.json   # 한국어 → 영어 번역표
 ├── tests/                  # unittest(Python) + Node 테스트
-├── requirements.txt / requirements-lock.txt
-├── .env.example            # 환경 변수 예시 (실제 키는 .env 에만)
-├── START_APP.cmd           # Windows 실행 스크립트
+├── requirements.txt        # Render 빌드에 사용 (gunicorn, psycopg, scipy 추가 필요)
+├── requirements-lock.txt   # 로컬 개발용 고정 버전
+├── .env.example            # 환경 변수 예시 (로컬은 .env, Render는 Environment 탭)
+├── START_APP.cmd           # Windows 로컬 실행 스크립트
 └── SETUP.md, AI_SETUP.md, FEATURE.md, KEY.md   # 이전 단계의 설정·개발 메모
 ```
 
@@ -135,14 +221,17 @@ team10/
 | GET / POST | `/api/wrong-answers`, `/api/wrong-answers/<id>/delete` | 저장된 오답 조회·삭제 (로그인 필요) |
 | GET / POST | `/api/conversations`, `/api/conversations/<id>/delete` | 저장된 대화 조회·저장·삭제 (로그인 필요) |
 
-JSON API는 같은 사이트에서 보낸 요청만 받습니다. 다른 Origin에서 보낸 요청은 403으로 거절합니다.
+JSON API는 같은 사이트에서 보낸 요청만 받습니다. 다른 Origin에서 보낸 요청은 403으로 거절합니다. Render에 배포하면 `https://<서비스 이름>.onrender.com`이 같은 사이트 기준이 됩니다.
 
-
+---
 
 ## 알려진 제한
 
 - AI 퀴즈와 답변은 일반적인 과목 내용을 바탕으로 생성되므로 실제 수업 범위와 다르거나 틀릴 수 있습니다. AI는 성적 데이터를 수정하지 않습니다.
 - 오답 노트와 저장된 대화는 개수 제한(10개 / 3개)을 넘으면 가장 오래된 항목부터 자동으로 지워집니다.
+- **공개 주소 보안:** Render에 배포하면 누구나 접속할 수 있습니다. 로그인은 학번 + 비밀번호로 데이터를 구분하는 해커톤용 방식이고 비밀번호가 평문으로 저장되므로, 실제 개인정보나 실제 비밀번호를 입력하지 않도록 안내합니다.
+- **AI 사용량 공유:** Render에 등록한 Groq 키 하나를 모든 방문자가 함께 사용합니다. 무료 한도를 넘으면 모든 사용자의 AI 기능이 잠시 멈춥니다. AI 퀴즈의 15초 간격 제한은 브라우저 세션 단위로만 적용됩니다.
+- **무료 플랜 제약:** 휴면 후 첫 접속에 약 1분이 걸리고, 무료 Postgres는 30일 후 만료됩니다.
 
 ---
 
