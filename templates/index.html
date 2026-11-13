@@ -1,88 +1,186 @@
+{#
+  첫 화면(랜딩 홈페이지)
+  - 상단: 다이나믹 아일랜드 (로그인 전용 버전, 섹션 이동용)
+  - 히어로: 왼쪽 = 기능 설명 칸(짧은 소개) / 오른쪽 = 로그인 칸(기존 로그인 폼 그대로)
+  - "자세히 알아보기" 클릭 시 아래 #details 섹션으로 부드럽게 스크롤
+  - 로그인 폼의 name / id 는 기존과 동일하게 유지 (/login 라우트와 호환)
+#}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>대학생 성적 관리 프로그램 - 로그인</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>대학생 성적 관리 프로그램</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-    <div class="container login-container">
-        <h1>🎓 대학생 성적 관리 프로그램</h1>
-        <p class="desc">학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.<br>(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)</p>
+<body class="modern landing" id="top">
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <ul class="flash-messages">
-                    {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
-                    {% endfor %}
-                </ul>
+    <!-- 다이나믹 아일랜드 (랜딩 전용) -->
+    <div class="island-wrap">
+        <nav class="island" id="island">
+            <a class="island-logo" href="#top" title="맨 위로" style="text-decoration:none;">🎓</a>
+            <a class="island-btn" href="#top">홈</a>
+            <a class="island-btn" href="#details">기능 소개</a>
+            <span class="island-divider"></span>
+            {% if session.get('student_id') %}
+                <a class="island-btn active" href="{{ url_for('scores') }}">📊 내 성적으로</a>
+            {% else %}
+                <a class="island-btn active" href="#login">🔐 로그인</a>
             {% endif %}
-        {% endwith %}
-
-        <div class="form-card">
-            <form action="{{ url_for('login') }}" method="POST">
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label for="student_id" style="display:block; margin-bottom:5px; font-weight:bold;">학번</label>
-                    <input type="text" id="student_id" name="student_id" 
-                           placeholder="예: 26101167 (8자리 숫자, 0 시작 불가)" 
-                           pattern="[1-9][0-9]{7}" 
-                           maxlength="8" 
-                           inputmode="numeric"
-                           required 
-                           style="width:100%; padding:10px; box-sizing:border-box;">
-                </div>
-
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label for="name" style="display:block; margin-bottom:5px; font-weight:bold;">이름</label>
-                    <input type="text" id="name" name="name" placeholder="예: 김준호" required style="width:100%; padding:10px; box-sizing:border-box;">
-                </div>
-
-                <div class="input-group" style="margin-bottom: 15px;">
-                    <label for="year" style="display:block; margin-bottom:5px; font-weight:bold;">학년</label>
-                    <select id="year" name="year" required style="width:100%; padding:10px;">
-                        <option value="" disabled selected>학년을 선택하세요</option>
-                        <option value="1">1학년</option>
-                        <option value="2">2학년</option>
-                        <option value="3">3학년</option>
-                        <option value="4">4학년</option>
-                    </select>
-                </div>
-
-                <div class="input-group" style="margin-bottom: 20px;">
-                    <label for="password" style="display:block; margin-bottom:5px; font-weight:bold;">비밀번호</label>
-                    <!-- 비밀번호 입력란과 보기 버튼을 감싸는 컨테이너 -->
-                    <div style="position: relative; display: flex; align-items: center;">
-                        <input type="password" id="password" name="password" 
-                               placeholder="특수문자(!@#$%^&*) 포함 필수" 
-                               required 
-                               style="width:100%; padding:10px; padding-right: 45px; box-sizing:border-box;">
-                        <button type="button" id="togglePassword" 
-                                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; font-size: 18px;" 
-                                title="비밀번호 표시/숨기기">(-)</button>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary" style="width:100%; padding:12px; background-color:#007bff; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer;">
-                    로그인 및 성적 관리 시작
-                </button>
-            </form>
-        </div>
+        </nav>
     </div>
 
-    <!-- 비밀번호 보기/숨기기 토글 스크립트 -->
+    <main class="landing-main">
+
+        <!-- ================= 히어로: 기능 설명 + 로그인 ================= -->
+        <section class="landing-hero">
+
+            <!-- 기능 설명 칸 (짧은 소개) -->
+            <div class="landing-intro">
+                <p class="landing-eyebrow">Team 10 · 대학생 학습 도우미</p>
+                <h1>성적부터 과제까지,<br>한 곳에서 관리하세요</h1>
+
+                <ul class="feature-chips">
+                    <li><span>📊</span><div><strong>성적</strong><small>과목 등록 · 평점 · 추이 그래프</small></div></li>
+                    <li><span>⚙️</span><div><strong>관리</strong><small>과목 찾기 · 수정 · 삭제</small></div></li>
+                    <li><span>🎯</span><div><strong>예측</strong><small>목표 학점별 기말 점수 계산</small></div></li>
+                    <li><span>🧠</span><div><strong>퀴즈</strong><small>전공 과목 학습 퀴즈</small></div></li>
+                    <li><span>🤖</span><div><strong>AI</strong><small>문제 해설 · 힌트 학습 파트너</small></div></li>
+                    <li><span>📅</span><div><strong>과제</strong><small>마감 일정 · D-day 알림</small></div></li>
+                </ul>
+
+                <a href="#details" class="btn-more">자세히 알아보기 ↓</a>
+            </div>
+
+            <!-- 로그인 칸 (기존 로그인 탭) -->
+            <div class="landing-login" id="login">
+                <h2>🔐 로그인</h2>
+                <p class="desc">학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.<br>(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)</p>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <ul class="flash-messages">
+                            {% for category, message in messages %}
+                                <li class="{{ category }}">{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endwith %}
+
+                <form action="{{ url_for('login') }}" method="POST">
+                    <div class="input-group">
+                        <label for="student_id">학번</label>
+                        <input type="text" id="student_id" name="student_id"
+                               placeholder="예: 26101167 (8자리 숫자, 0 시작 불가)"
+                               pattern="[1-9][0-9]{7}"
+                               maxlength="8"
+                               inputmode="numeric"
+                               required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="name">이름</label>
+                        <input type="text" id="name" name="name" placeholder="예: 김준호" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="year">학년</label>
+                        <select id="year" name="year" required>
+                            <option value="" disabled selected>학년을 선택하세요</option>
+                            <option value="1">1학년</option>
+                            <option value="2">2학년</option>
+                            <option value="3">3학년</option>
+                            <option value="4">4학년</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="password">비밀번호</label>
+                        <div class="password-wrap">
+                            <input type="password" id="password" name="password"
+                                   placeholder="특수문자(!@#$%^&*) 포함 필수"
+                                   required>
+                            <button type="button" id="togglePassword" title="비밀번호 표시/숨기기">(-)</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">로그인 및 성적 관리 시작</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ================= 자세히 알아보기: 기능 상세 설명 ================= -->
+        <section class="landing-details" id="details">
+            <p class="landing-eyebrow">FEATURES</p>
+            <h2>이런 기능을 사용할 수 있어요</h2>
+
+            <div class="detail-grid">
+                <article class="detail-card">
+                    <span class="detail-icon">📊</span>
+                    <h3>성적</h3>
+                    <p>커리큘럼에 있는 과목을 골라 수강 연도·학기·성적 등급을 입력하면 학점이 자동으로 채워집니다.
+                       전체 평점과 이수 학점을 바로 계산해 보여주고, 학기별 평점 변화를 꺾은선 그래프로 확인할 수 있어
+                       내 성적 흐름을 한눈에 파악할 수 있습니다.</p>
+                </article>
+
+                <article class="detail-card">
+                    <span class="detail-icon">⚙️</span>
+                    <h3>관리</h3>
+                    <p>등록한 과목을 학기별로 모아 보여줍니다. 과목 이름으로 검색해 언제 수강했는지 바로 찾을 수 있고,
+                       잘못 입력한 과목은 수정하거나 삭제할 수 있습니다. 같은 과목이 중복 등록되지 않도록 자동으로 확인합니다.</p>
+                </article>
+
+                <article class="detail-card">
+                    <span class="detail-icon">🎯</span>
+                    <h3>예측</h3>
+                    <p>수강 인원, 내 중간고사 점수, 중간고사 평균·표준편차, 시험 반영 비율과 목표 학점을 입력하면
+                       정규분포를 바탕으로 목표 학점을 받기 위해 기말고사에서 필요한 점수와 석차를 계산해 줍니다.
+                       시험 준비 목표를 숫자로 세울 수 있습니다.</p>
+                </article>
+
+                <article class="detail-card">
+                    <span class="detail-icon">🧠</span>
+                    <h3>퀴즈</h3>
+                    <p>학년·학기별 전공 과목을 골라 객관식 퀴즈를 풀 수 있습니다. 풀이가 끝나면 문제마다 정답 여부와
+                       해설을 보여주고, 틀린 문제는 AI 학습 파트너에게 바로 넘겨 다시 공부할 수 있습니다.</p>
+                </article>
+
+                <article class="detail-card">
+                    <span class="detail-icon">🤖</span>
+                    <h3>AI 학습 파트너</h3>
+                    <p>한국어로 대화하는 AI 튜터입니다. 퀴즈 문제 해설과 힌트, 틀린 문제 복습, 전체 결과에 대한 강점·보완점 분석,
+                       관련 강의 검색과 연습 문제 출제까지 도와줍니다. 답을 바로 알려주기보다 한 문제씩 함께 이해하도록 안내합니다.</p>
+                </article>
+
+                <article class="detail-card">
+                    <span class="detail-icon">📅</span>
+                    <h3>과제</h3>
+                    <p>과목별로 과제명과 마감 날짜·시간(한국 시간 기준)을 등록해 할 일과 완료한 과제를 나눠 관리합니다.
+                       마감까지 남은 시간을 D-day로 보여주고, 마감이 다가온 과제는 다른 화면 상단에서도 알림으로 확인할 수 있습니다.</p>
+                </article>
+            </div>
+
+            <div class="details-cta">
+                <a href="#login" class="btn-more">지금 로그인하고 시작하기 ↑</a>
+            </div>
+        </section>
+    </main>
+
     <script>
+        // 비밀번호 보기/숨기기 토글
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
-
         togglePassword.addEventListener('click', function () {
-            // input 타입이 password면 text로, text면 password로 전환
             const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
             passwordInput.setAttribute('type', type);
-            
-            // 아이콘 변경 (눈 모양 (-) / 가려진 눈 모양 (0))
             this.textContent = type === 'password' ? '(-)' : '(0)';
         });
+
+        // 스크롤 시 아일랜드 그림자 강조 (다른 화면과 동일한 효과)
+        const island = document.getElementById('island');
+        window.addEventListener('scroll', function () {
+            island.classList.toggle('scrolled', window.scrollY > 10);
+        }, { passive: true });
     </script>
 </body>
 </html>
