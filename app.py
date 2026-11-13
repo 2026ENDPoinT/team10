@@ -105,6 +105,19 @@ def scores():
                            course_credits=COURSE_CREDITS,
                            allowed_semesters=ALLOWED_SEMESTERS)
 
+@app.route('/quiz')
+def quiz():
+    # 학습 퀴즈 페이지 (학생 정보 유지)
+    student_id = request.args.get('student_id', '')
+    name = request.args.get('name', '')
+    year = request.args.get('year', '')
+
+    return render_template('quiz.html',
+                           student_id=student_id,
+                           name=name,
+                           year=year,
+                           curriculum=CURRICULUM) 
+
 @app.route('/add', methods=['POST'])
 def add():
     if 'student_id' not in session or 'password' not in session:
