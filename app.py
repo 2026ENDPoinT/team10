@@ -97,54 +97,6 @@ init_study_records(app)
 def index():
     return render_template('index.html')
 
-"""
-@app.route('/login', methods=['POST'])
-def login():
-    student_id = request.form.get('student_id', '').strip()
-    name = request.form.get('name', '').strip()
-    year = request.form.get('year', '').strip()
-    password = request.form.get('password', '').strip()
-
-    if not re.match(r'^[1-9][0-9]{7}$', student_id):
-        flash('학번은 0으로 시작하지 않는 8자리 숫자여야 합니다.', 'error')
-        return redirect(url_for('index'))
-
-    if not name:
-        flash('이름을 입력해주세요.', 'error')
-        return redirect(url_for('index'))
-
-    if not year:
-        flash('학년을 선택해주세요.', 'error')
-        return redirect(url_for('index'))
-
-
-    # 학번 하나에 계정 하나. 처음 쓰는 학번이면 계정을 만들고, 이미 있으면 비밀번호를 확인한다.
-    if find_student(student_id) is None:
-        if not is_valid_password(password):
-            flash(PASSWORD_RULE_MESSAGE, 'error')
-            return redirect(url_for('index'))
-        account = create_student(student_id, password, name, year)
-    else:
-        account = authenticate_student(student_id, password)
-        if account is None:
-            flash('학번 또는 비밀번호가 올바르지 않습니다.', 'error')
-            return redirect(url_for('index'))
-        update_student_profile(account['id'], name, year)
-    if account is None:  # 같은 학번 계정이 방금 다른 요청에서 만들어진 경우
-        flash('학번 또는 비밀번호가 올바르지 않습니다.', 'error')
-        return redirect(url_for('index'))
-
-    # 세션 쿠키에는 비밀번호를 저장하지 않는다 (Flask 세션은 서명만 되고 암호화되지 않음)
-    session.clear()
-    session['user_id'] = account['id']
-    session['assignment_owner'] = account['id']
-    session['assignment_navigation'] = {'student_id': student_id, 'name': name, 'year': year}
-    session['student_id'] = student_id
-    session['name'] = name
-    session['year'] = year
-
-    return redirect(url_for('scores'))
-"""
 @app.route('/login', methods=['POST'])
 def login():
     student_id = request.form.get('student_id', '').strip()
@@ -166,15 +118,15 @@ def login():
 
     # (학번, 비밀번호) 조합마다 별도의 계정. 처음 쓰는 조합이면 새 계정을 만든다.
     account = get_student(student_id, password)
+    created = False
     if account is None:
         if not is_valid_password(password):
             flash(PASSWORD_RULE_MESSAGE, 'error')
             return redirect(url_for('index'))
         account = create_student(student_id, password, name, year)
+        created = account is not None
         if account is None:  # 같은 조합의 계정이 방금 다른 요청에서 만들어진 경우
             account = get_student(student_id, password)
-        else:
-            flash('새 성적 셋이 만들어졌습니다. 같은 학번이라도 비밀번호가 다르면 다른 계정입니다.', 'success')
     if account is None:
         flash('로그인에 실패했습니다. 다시 시도해주세요.', 'error')
         return redirect(url_for('index'))
@@ -188,10 +140,10 @@ def login():
     session['student_id'] = student_id
     session['name'] = name
     session['year'] = year
+    if created:  # session.clear() 뒤에 남겨야 다음 화면에 보인다
+        flash('새 성적 셋이 만들어졌습니다. 같은 학번이라도 비밀번호가 다르면 다른 계정입니다.', 'success')
 
     return redirect(url_for('scores'))
-
-
 
 @app.route('/logout')
 def logout():

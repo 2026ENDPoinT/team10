@@ -34,7 +34,7 @@ class AssignmentTests(unittest.TestCase):
         self.assertEqual(self.create().status_code,302)
         self.assertIn('과제', self.client.get('/assignments/').get_data(as_text=True))
         other = app.test_client()
-        other.post('/login', data={'student_id':'87654321','name':'Other','year':'1','password':'other!'})
+        other.post('/login', data={'student_id':'12345678','name':'Other','year':'1','password':'other!'})
         other.get('/assignments/')
         with other.session_transaction() as s:
             token = s['assignment_csrf']

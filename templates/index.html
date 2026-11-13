@@ -43,7 +43,7 @@
             <!-- 로그인 칸 (기존 로그인 탭) -->
             <div class="landing-login" id="login">
                 <h2>{{ t('🔐 로그인') }}</h2>
-                <p class="desc">{{ t('학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.') }}<br>{{ t('(처음 입력한 학번은 새 계정으로 만들어지고, 이후에는 같은 비밀번호로 로그인합니다)') }}</p>
+                <p class="desc">{{ t('학번, 이름, 학년, 비밀번호를 입력하여 로그인하세요.') }}<br>{{ t('(학번과 비밀번호 조합에 따라 독립된 성적 셋이 관리됩니다)') }}</p>
 
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
