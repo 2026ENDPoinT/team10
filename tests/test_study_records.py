@@ -17,7 +17,7 @@ class StudyRecordTests(unittest.TestCase):
         use_test_database(self, self.directory.name)
         app.config.update(TESTING=True, AI_MODE='groq', GROQ_API_KEY='test')
         self.client = self.login('26101150', 'mine!')
-        self.user_id = database.find_student('26101150')['id']
+        self.user_id = database.get_student('26101150', 'mine!')['id']
 
     def tearDown(self):
         app.config.clear()
@@ -51,10 +51,9 @@ class StudyRecordTests(unittest.TestCase):
         self.assertEqual(items[1]['explanation'], '해설 2')
         self.assertEqual(items[1]['subject'], '선형대수학')
 
-        # 다른 계정에는 보이지 않음
-        self.assertEqual(self.login('26101151', 'other!').get('/api/wrong-answers').json['items'], [])
-        # 같은 학번이라도 비밀번호가 틀리면 로그인되지 않음
-        self.assertEqual(self.login('26101150', 'wrong!').get('/api/wrong-answers').status_code, 401)
+        # 같은 학번이라도 비밀번호가 다르면 다른 계정이므로 보이지 않음
+        self.assertEqual(self.login('26101150', 'other!').get('/api/wrong-answers').json['items'], [])
+        self.assertEqual(self.login('26101151', 'mine!').get('/api/wrong-answers').json['items'], [])
         # 로그인하지 않으면 조회 불가
         self.assertEqual(app.test_client().get('/api/wrong-answers').status_code, 401)
 
@@ -73,7 +72,7 @@ class StudyRecordTests(unittest.TestCase):
     def test_delete_wrong_answer_is_owner_only_and_same_origin(self):
         self.take_quiz(self.client, [self.question(1)], [0])
         item_id = self.client.get('/api/wrong-answers').json['items'][0]['id']
-        other = self.login('26101151', 'other!')
+        other = self.login('26101150', 'other!')
         self.assertEqual(other.post(f'/api/wrong-answers/{item_id}/delete', json={}).status_code, 404)
         self.assertEqual(self.client.post(f'/api/wrong-answers/{item_id}/delete', json={},
                                           headers={'Origin': 'https://evil.test'}).status_code, 403)
@@ -110,7 +109,7 @@ class StudyRecordTests(unittest.TestCase):
 
     def test_conversations_are_private_validated_and_deletable(self):
         saved = self.client.post('/api/conversations', json={'messages': self.chat('비밀')}).json['id']
-        other = self.login('26101151', 'other!')
+        other = self.login('26101150', 'other!')
         self.assertEqual(other.get('/api/conversations').json['items'], [])
         # 다른 계정이 남의 대화 번호로 저장해도 덮어쓰지 못함
         hijack = other.post('/api/conversations', json={'id': saved, 'messages': self.chat('덮어쓰기')})
@@ -134,9 +133,41 @@ class StudyRecordTests(unittest.TestCase):
         self.client.post('/change-password', data={'new_password': 'newpw!'})
         self.assertEqual(len(self.client.get('/api/wrong-answers').json['items']), 1)
         self.assertEqual(len(self.client.get('/api/conversations').json['items']), 1)
-        # 예전 비밀번호로는 로그인되지 않고, 새 비밀번호로 로그인하면 같은 기록이 보인다
-        self.assertEqual(self.login('26101150', 'mine!').get('/api/conversations').status_code, 401)
+        # 새 비밀번호로 로그인하면 같은 기록이 보이고, 예전 비밀번호는 이제 다른(빈) 계정이다
         self.assertEqual(len(self.login('26101150', 'newpw!').get('/api/conversations').json['items']), 1)
+        self.assertEqual(self.login('26101150', 'mine!').get('/api/conversations').json['items'], [])
+
+    def test_password_change_rejects_password_of_another_grade_set(self):
+        self.login('26101150', 'other!')
+        changed = self.client.post('/change-password', data={'new_password': 'other!'}, follow_redirects=True)
+        self.assertIn('같은 학번에서 이미 사용 중인 비밀번호입니다.', changed.get_data(as_text=True))
+        self.assertEqual(database.get_student('26101150', 'mine!')['id'], self.user_id)
+
+    # ---------------- 로그인 ----------------
+    def test_same_student_id_with_different_passwords_are_separate_accounts(self):
+        first = app.test_client()
+        response = first.post('/login', data={'student_id': '22222222', 'name': 'A', 'year': '1', 'password': '!!!!!'},
+                              follow_redirects=True)
+        self.assertIn('새 성적 셋이 만들어졌습니다.', response.get_data(as_text=True))
+        first.post('/add', data={'name_input': '선형대수학', 'semester_year': '2026', 'semester_term': '1학기', 'grade': 'A+'})
+        second = app.test_client()
+        second.post('/login', data={'student_id': '22222222', 'name': 'B', 'year': '1', 'password': '@@@@@'})
+        first_id = database.get_student('22222222', '!!!!!')['id']
+        second_id = database.get_student('22222222', '@@@@@')['id']
+        self.assertNotEqual(first_id, second_id)
+        self.assertEqual([c['name'] for c in database.get_all_courses(first_id)], ['선형대수학'])
+        self.assertEqual(database.get_all_courses(second_id), [])
+        again = app.test_client()
+        response = again.post('/login', data={'student_id': '22222222', 'name': 'A', 'year': '1', 'password': '!!!!!'},
+                              follow_redirects=True)
+        self.assertNotIn('새 성적 셋이 만들어졌습니다.', response.get_data(as_text=True))
+        with again.session_transaction() as session:
+            self.assertEqual(session['user_id'], first_id)
+        # 새 조합은 비밀번호 규칙을 지켜야 만들어진다
+        weak = app.test_client().post('/login', data={'student_id': '22222222', 'name': 'C', 'year': '1', 'password': 'abc'})
+        self.assertEqual(weak.headers['Location'], '/')
+        with self.client.session_transaction() as session:
+            self.assertNotIn('password', session)
 
     def test_pages_show_saved_sections(self):
         for url, marker in [('/quiz', 'id="wrong-notes"'), ('/ai/', 'id="saved-chats"')]:

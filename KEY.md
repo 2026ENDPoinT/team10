@@ -40,7 +40,9 @@ DB_NAME: 로컬 SQLite 파일 경로 ("data/database.db")
 
 conn: get_db_connection()이 돌려주는 연결 객체 (SQL은 '?' 자리표시자로 작성, PostgreSQL에서는 자동으로 '%s'로 변환)
 
-students 테이블: id(기본키), student_id(학번, UNIQUE), password_hash, name, year
+students 테이블: id(기본키), student_id(학번), password_key(비밀번호로 만든 키), name, year — (student_id, password_key) UNIQUE, 학번·비밀번호 조합마다 별도 계정
+
+PASSWORD_PEPPER: 환경변수. password_key 를 만들 때 쓰는 서버 비밀값 (PostgreSQL 사용 시 필수, 바꾸면 안 됨)
 
 courses 테이블 컬럼명 (데이터 추가/수정/조회 시 정확히 일치해야 함)
 

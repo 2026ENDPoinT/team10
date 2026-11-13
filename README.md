@@ -84,7 +84,7 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 
 | 테이블 | 내용 | 기존 위치 |
 |---|---|---|
-| `students` | 계정. `id`(기본키), `student_id`(학번, UNIQUE), `password_hash`(비밀번호 해시), 이름, 학년 | `database.db` |
+| `students` | 계정. `id`(기본키), `student_id`(학번), `password_key`(비밀번호로 만든 키), 이름, 학년. `(student_id, password_key)`가 UNIQUE라서 학번·비밀번호 조합마다 별도의 계정입니다. | `database.db` |
 | `courses` | 과목·학기·학점·등급·평점 | `database.db` |
 | `wrong_answers` | 퀴즈 오답 노트. 계정당 최근 10개, 같은 문제는 중복 없이 갱신됩니다. | `database.db` |
 | `chat_conversations` | AI 대화 기록. 계정당 최근 3개가 남습니다. | `database.db` |
@@ -94,9 +94,10 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 - 앱은 Render가 발급하는 **Internal Database URL**을 환경 변수 `DATABASE_URL`로 받아 접속합니다.
 - 테이블은 앱이 시작할 때 자동으로 만들어집니다(`database.py`의 `init_db()`). SQL을 따로 실행할 필요가 없습니다.
 - 계정과 데이터 접근 규칙
-  - 학번 하나에 계정 하나입니다. 처음 쓰는 학번으로 로그인하면 계정이 만들어지고, 이미 있는 학번은 비밀번호가 맞아야 로그인됩니다.
-  - 비밀번호는 해시(`werkzeug.security`)로만 저장하고, 세션 쿠키에는 넣지 않습니다(세션에는 `user_id`만).
-  - 성적·오답·대화·과제는 로그인한 계정(`user_id`)의 자료만 조회하고 수정할 수 있습니다. 비밀번호를 바꿔도 자료는 그대로 유지됩니다.
+  - **학번 + 비밀번호 조합마다 별도의 계정(성적 셋)입니다.** 예: 학번 22222222에 비밀번호 `!!!!!`와 `@@@@@`는 서로 다른 계정입니다. 처음 쓰는 조합으로 로그인하면 새 계정이 만들어집니다(이때 비밀번호 규칙을 검사합니다).
+  - 비밀번호는 평문으로 저장하지 않습니다. `scrypt(비밀번호, salt = PASSWORD_PEPPER + 학번)`으로 만든 키(`password_key`)만 저장하며, 같은 조합이면 항상 같은 키가 나와서 계정을 찾을 수 있습니다. 세션 쿠키에는 비밀번호를 넣지 않습니다(세션에는 `user_id`만).
+  - 성적·오답·대화·과제는 로그인한 계정(`user_id`)의 자료만 조회하고 수정할 수 있습니다. 비밀번호를 바꿔도 자료는 그대로 유지되며, 같은 학번의 다른 계정이 쓰는 비밀번호로는 바꿀 수 없습니다.
+  - 예전 계정 구조의 테이블은 시작할 때 지우지 않고 `legacy_*` 이름으로 보관합니다.
 
 ### 로컬 개발과 테스트
 
@@ -145,6 +146,7 @@ Groq 키 발급 방법과 문제 해결은 [AI_SETUP.md](AI_SETUP.md)를 참고�
 |---|---|
 | `DATABASE_URL` | 1단계에서 복사한 Internal Database URL |
 | `FLASK_SECRET_KEY` | **필수.** 긴 임의 문자열. 비워 두면 재시작·휴면 때마다 모두 로그아웃되고, gunicorn 작업 프로세스마다 키가 달라져 로그인이 풀릴 수 있습니다. |
+| `PASSWORD_PEPPER` | **필수(`DATABASE_URL`을 쓸 때).** 긴 임의 문자열. 비밀번호 키를 만들 때 쓰며, 없으면 서버가 시작되지 않습니다. **한 번 정한 뒤 바꾸면 모든 계정에 로그인할 수 없으니 절대 바꾸지 마세요.** 로컬 SQLite에서는 없어도 됩니다. |
 | `AI_MODE`, `GROQ_API_KEY`, `GROQ_MODEL` | AI 기능 설정 (위 `.env` 설정 표와 같음) |
 | `YOUTUBE_API_KEY` | 선택 사항 |
 | `PYTHON_VERSION` | Render에서 쓸 Python 버전. 지원 버전은 [Render 문서](https://render.com/docs/python-version)를 확인합니다. |
