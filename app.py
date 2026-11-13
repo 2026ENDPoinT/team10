@@ -1,6 +1,12 @@
+import math
 import re
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from database import init_db, save_or_update_student, get_all_courses, get_course_by_id, add_course, update_course, delete_course
+from scipy.stats import norm
+from database import (
+    init_db, save_or_update_student, get_all_courses, 
+    get_course_by_id, add_course, update_course, delete_course, 
+    update_student_password
+)
 from gpa_calculator import GRADE_POINTS, calculate_gpa
 
 app = Flask(__name__)
@@ -64,10 +70,8 @@ def login():
         flash('비밀번호는 특수문자(!@#$%^&*) 중 하나 이상을 포함해야 합니다.', 'error')
         return redirect(url_for('index'))
 
-    # 로그인 시 입력한 이름과 학년으로 DB 정보를 갱신하거나 새로 저장
     save_or_update_student(student_id, name, year, password)
 
-    # 세션에 최신 정보 반영
     session['student_id'] = student_id
     session['password'] = password
     session['name'] = name
@@ -81,7 +85,7 @@ def logout():
     flash('성공적으로 로그아웃되었습니다.', 'success')
     return redirect(url_for('index'))
 
-@app.route('/scores')
+@app.route('/scores', methods=['GET'])
 def scores():
     if 'student_id' not in session or 'password' not in session:
         flash('로그인이 필요합니다.', 'error')
@@ -105,18 +109,163 @@ def scores():
                            course_credits=COURSE_CREDITS,
                            allowed_semesters=ALLOWED_SEMESTERS)
 
+@app.route('/manage', methods=['GET'])
+def manage():
+    if 'student_id' not in session or 'password' not in session:
+        flash('로그인이 필요합니다.', 'error')
+        return redirect(url_for('index'))
+
+    student_id = session['student_id']
+    password = session['password']
+    name = session['name']
+    year = session['year']
+
+    selected_search_course = request.args.get('search_course', '').strip()
+    search_result_semester = None
+    searched = False
+
+    courses = get_all_courses(student_id, password)
+
+    if selected_search_course:
+        searched = True
+        for c in courses:
+            if c['name'] == selected_search_course:
+                search_result_semester = c['semester']
+                break
+
+    stats = calculate_gpa(courses)
+
+    return render_template('manage.html',
+                           student_id=student_id,
+                           name=name,
+                           year=year,
+                           stats=stats,
+                           curriculum=CURRICULUM,
+                           selected_search_course=selected_search_course,
+                           search_result_semester=search_result_semester,
+                           searched=searched)
+
+@app.route('/predict', methods=['GET', 'POST'])
+def predict():
+    if 'student_id' not in session or 'password' not in session:
+        flash('로그인이 필요합니다.', 'error')
+        return redirect(url_for('index'))
+
+    student_id = session['student_id']
+    name = session['name']
+    year = session['year']
+
+    result = None
+
+    if request.method == 'POST':
+        try:
+            def get_float(key, default):
+                val = request.form.get(key)
+                if val is None or str(val).strip() == '':
+                    return default
+                return float(val)
+
+            def get_int(key, default):
+                val = request.form.get(key)
+                if val is None or str(val).strip() == '':
+                    return default
+                return int(val)
+
+            total_students = get_int('total_students', 40)
+            my_mid = get_float('my_mid', 0)
+            mid_mean = get_float('mid_mean', 0)
+            mid_std = get_float('mid_std', 10)
+            if mid_std <= 0: mid_std = 1.0
+            
+            mid_weight = get_float('mid_weight', 40)
+            final_weight = get_float('final_weight', 40)
+            target_grade = request.form.get('target_grade', 'A+')
+
+            r_aplus = get_float('r_aplus', 10)
+            r_azero = get_float('r_azero', 20)
+            r_bplus = get_float('r_bplus', 20)
+            r_bzero = get_float('r_bzero', 20)
+            r_cplus = get_float('r_cplus', 15)
+            r_czero = get_float('r_czero', 15)
+
+            cumulative_pcts = {
+                'A+': r_aplus,
+                'A0': r_aplus + r_azero,
+                'B+': r_aplus + r_azero + r_bplus,
+                'B0': r_aplus + r_azero + r_bplus + r_bzero,
+                'C+': r_aplus + r_azero + r_bplus + r_bzero + r_cplus,
+                'C0': r_aplus + r_azero + r_bplus + r_bzero + r_cplus + r_czero
+            }
+
+            target_pct = cumulative_pcts.get(target_grade, 30.0)
+            target_ratio = target_pct / 100.0
+
+            z_target = norm.ppf(1.0 - target_ratio)
+            z_mid = (my_mid - mid_mean) / mid_std
+
+            total_w = mid_weight + final_weight
+            w_m = (mid_weight / total_w) if total_w > 0 else 0.5
+            w_f = (final_weight / total_w) if total_w > 0 else 0.5
+
+            combined_std_factor = math.sqrt(w_m**2 + w_f**2)
+            if w_f > 0:
+                z_final = ((z_target * combined_std_factor) - (w_m * z_mid)) / w_f
+            else:
+                z_final = 0.0
+
+            required_final_score = mid_mean + (z_final * mid_std)
+            final_cdf = norm.cdf(z_final)
+            required_final_rank_ratio = max(0.0, min(1.0, 1.0 - final_cdf))
+            required_final_rank = max(1, min(total_students, math.ceil(total_students * required_final_rank_ratio)))
+
+            result = {
+                'total_students': total_students,
+                'target_grade': target_grade,
+                'target_pct': target_pct,
+                'required_final_rank': required_final_rank,
+                'required_final_score': round(required_final_score, 1),
+                'required_final_ratio': round(required_final_rank_ratio * 100, 1)
+            }
+        except Exception as e:
+            print("PREDICT ERROR:", e)
+            flash(f'입력값을 올바르게 확인해주세요. (상세: {e})', 'error')
+
+    return render_template('predict.html',
+                           student_id=student_id,
+                           name=name,
+                           year=year,
+                           result=result)
+
 @app.route('/quiz')
 def quiz():
-    # 학습 퀴즈 페이지 (학생 정보 유지)
-    student_id = request.args.get('student_id', '')
-    name = request.args.get('name', '')
-    year = request.args.get('year', '')
+    student_id = session.get('student_id', '')
+    name = session.get('name', '')
+    year = session.get('year', '')
 
     return render_template('quiz.html',
                            student_id=student_id,
                            name=name,
                            year=year,
                            curriculum=CURRICULUM) 
+
+@app.route('/change-password', methods=['POST'])
+def change_password():
+    if 'student_id' not in session or 'password' not in session:
+        return redirect(url_for('index'))
+    
+    student_id = session['student_id']
+    old_password = session['password']
+    new_password = request.form.get('new_password', '').strip()
+
+    if not re.search(r'[!@#$%^&*]', new_password):
+        flash('새 비밀번호는 특수문자(!@#$%^&*) 중 하나 이상을 포함해야 합니다.', 'error')
+        return redirect(request.referrer or url_for('scores'))
+
+    update_student_password(student_id, old_password, new_password)
+    session['password'] = new_password
+    flash('비밀번호가 성공적으로 변경되었습니다.', 'success')
+    
+    return redirect(request.referrer or url_for('scores'))
 
 @app.route('/add', methods=['POST'])
 def add():
@@ -165,7 +314,7 @@ def edit(course_id):
     course = get_course_by_id(course_id)
     if not course or course['student_id'] != session['student_id'] or course['password'] != session['password']:
         flash('존재하지 않거나 권한이 없는 과목입니다.', 'error')
-        return redirect(url_for('scores'))
+        return redirect(url_for('manage'))
 
     curr_year = "2026"
     curr_term = "1학기"
@@ -205,7 +354,7 @@ def edit(course_id):
         
         update_course(course_id, c_name, semester, credit, grade, point)
         flash('과목 정보가 수정되었습니다.', 'success')
-        return redirect(url_for('scores'))
+        return redirect(url_for('manage'))
 
     return render_template('edit.html', course=course, grades=GRADE_POINTS.keys(), curriculum=CURRICULUM, course_credits=COURSE_CREDITS, allowed_semesters=ALLOWED_SEMESTERS, curr_year=curr_year, curr_term=curr_term)
 
@@ -219,7 +368,7 @@ def delete(course_id):
         delete_course(course_id)
         flash('과목이 삭제되었습니다.', 'success')
     
-    return redirect(url_for('scores'))
+    return redirect(url_for('manage'))
 
 if __name__ == '__main__':
     app.run(debug=True)
